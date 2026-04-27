@@ -25,3 +25,23 @@ go.work.sum
 # env file
 .env
 
+
+# Binaire compilé 
+/docverify
+
+# macOS
+**/.DS_Store
+
+# Workspace local                                                                                                     
+*.code-workspace
+desktop/                                                                                                              
+.bash_profile   
+
+# Notes brutes
+tmp.txt
+
+# Inputs de test                                                                       
+input*.json
+batch1.json                                                                                                           
+    
+docs/

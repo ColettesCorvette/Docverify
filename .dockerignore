@@ -1,0 +1,8 @@
+# .dockerignore
+*.md
+*.png
+*.jpg
+*.pdf
+.git
+.gitignore
+testdata/

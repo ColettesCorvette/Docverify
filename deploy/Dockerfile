@@ -1,0 +1,26 @@
+# --- Compilation --- 
+FROM --platform=linux/arm64 golang:1.22-bookworm AS builder
+WORKDIR /usr/local/app
+COPY go.mod .
+RUN go mod download
+COPY *.go ./
+RUN go build -o docverify .
+
+# --- Image finale ---
+FROM --platform=linux/arm64 debian:bookworm-slim
+WORKDIR /usr/local/app
+
+RUN apt-get update && apt-get install -y \
+    imagemagick \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-fra \
+    tesseract-ocr-osd \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/app/docverify .
+COPY *.json ./
+
+EXPOSE 8680
+ENTRYPOINT ["/usr/local/app/docverify"]
