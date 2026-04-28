@@ -4,15 +4,17 @@
 
 Documentation disponible sur le [wiki Gitea](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
 
-**Machine :** 
+**Machines :** 
 
-Mac Mini M4 Pro (ARM64) - 12 CPUs — 48 GB RAM
+1x Mac Mini M4 Pro (ARM64) - 12 CPUs — 48 GB RAM
+
+3x En attente 
 
 ## Prérequis
 
 ```bash
 # Runtime Docker 
-  brew install colima docker docker-compose 
+brew install colima docker docker-compose 
 
 # Outils K8s + traitement docs                                                                                     
 brew install k3d kubectl tesseract tesseract-lang poppler imagemagick jq
@@ -41,7 +43,7 @@ uv pip install -e ".[vision]"
 ## Build de l'image docverify
 
 ```bash
-cd ~/Desktop/LLM/ocr/docverify
+cd docverify
 docker build -f deploy/Dockerfile -t docverify-docverify:latest .
 ```
 

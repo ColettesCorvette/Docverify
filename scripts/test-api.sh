@@ -1,8 +1,7 @@
 #!/bin/bash
 # Script de test de l'API docverify
 # Usage : ./test-api.sh [health|check|batch|all]
-#
-# Pré-requis : serveur docverify lancé (go run .) sur :8680, Ollama sur :11434
+
 
 set -e
 
