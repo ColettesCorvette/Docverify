@@ -28,6 +28,7 @@ go.work.sum
 
 # Binaire compilé 
 /docverify
+/testclient
 
 # macOS
 **/.DS_Store
