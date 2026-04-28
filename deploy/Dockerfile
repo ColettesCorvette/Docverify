@@ -4,7 +4,7 @@ WORKDIR /usr/local/app
 COPY go.mod .
 RUN go mod download
 COPY *.go ./
-RUN go build -o docverify .
+RUN ggo build -o /docverify ./cmd/docverify
 
 # --- Image finale ---
 FROM --platform=linux/arm64 debian:bookworm-slim
