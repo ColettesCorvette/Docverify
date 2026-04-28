@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: avast
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: avast
+  template:
+    metadata:
+      labels:
+        app: avast
+    spec:
+      containers:
+        - name: avast
+          image: <image-avast-a-definir>
+          ports:
+            - containerPort: 8080
+          # TODO: resources, readinessProbe, livenessProbe
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: avast-svc
+spec:
+  type: ClusterIP
+  selector:
+    app: avast
+  ports:
+    - port: 8080
+      targetPort: 8080

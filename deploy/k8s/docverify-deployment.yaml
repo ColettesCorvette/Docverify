@@ -24,6 +24,11 @@ spec:
         env:
         - name: LLM_URL
           value: "http://host.docker.internal:8000"
+        - name: RSA_PRIVATE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: docverify-keys
+              key: rsa-private.pem
         livenessProbe:
           httpGet:
             path: /health
