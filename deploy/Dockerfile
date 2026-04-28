@@ -3,8 +3,8 @@ FROM --platform=linux/arm64 golang:1.22-bookworm AS builder
 WORKDIR /usr/local/app
 COPY go.mod .
 RUN go mod download
-COPY *.go ./
-RUN ggo build -o /docverify ./cmd/docverify
+COPY . .
+RUN go build -o /docverify ./cmd/docverify
 
 # --- Image finale ---
 FROM --platform=linux/arm64 debian:bookworm-slim
