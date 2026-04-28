@@ -1,4 +1,4 @@
-package main
+package docverify
 
 import (
 	"bytes"
@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const defaultModel = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+const DefaultModel = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
 
 // --- Format OpenAI-compatible (vllm-mlx, vLLM, Ollama >= 0.4 via /v1) ------
 

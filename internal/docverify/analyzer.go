@@ -1,4 +1,4 @@
-package main
+package docverify
 
 import (
 	"fmt"
@@ -519,4 +519,183 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 	}
 
 	return result
+}
+
+// ── Types métier ──────────────────────────────────────────────────────────────
+
+// Individual représente un membre d'un dossier (mode batch).
+type Individual struct {
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Surname     string   `json:"surname"`
+	BirthDate   string   `json:"birth_date"`
+	PostalCodes []string `json:"postal_codes"`
+	Cities      []string `json:"cities"`
+	Referent    bool     `json:"referent"`
+}
+
+// Document représente un fichier à vérifier dans un batch.
+type Document struct {
+	ID          string   `json:"id"`
+	Path        string   `json:"path"`
+	Individual  string   `json:"individual"`
+	Checks      []string `json:"checks"`
+	Label       string   `json:"label"`
+	ValidMonths int      `json:"valid_months"`
+}
+
+// BatchInput est le format d'entrée pour un batch (individus + documents).
+type BatchInput struct {
+	Individuals []Individual `json:"individuals"`
+	Documents   []Document   `json:"documents"`
+	Model       string       `json:"model"`
+	OllamaURL   string       `json:"ollama_url"`
+}
+
+// Input est l'ancien format mono-document (rétrocompatibilité).
+type Input struct {
+	Name         string   `json:"name"`
+	Surname      string   `json:"surname"`
+	ValidMonths  int      `json:"valid_months"`
+	PostalCodes  []string `json:"postal_codes"`
+	DocumentPath string   `json:"document_path"`
+	Model        string   `json:"model"`
+	OllamaURL    string   `json:"ollama_url"`
+}
+
+// ReferentAddress stocke l'adresse validée du référent pour propagation.
+type ReferentAddress struct {
+	PostalMatch string
+	CityMatch   string
+}
+
+// DocResult est le résultat d'évaluation d'un document.
+type DocResult struct {
+	DocumentID          string         `json:"document_id"`
+	Label               string         `json:"label,omitempty"`
+	IndividualID        string         `json:"individual_id"`
+	Checks              []string       `json:"checks"`
+	OK                  bool           `json:"ok"`
+	AddressFromReferent bool           `json:"address_from_referent,omitempty"`
+	Errors              []string       `json:"errors,omitempty"`
+	Analysis            AnalysisResult `json:"analysis"`
+}
+
+// BuildInput construit un Input adapté à l'individu et aux checks demandés.
+func BuildInput(ind Individual, doc Document, batch BatchInput) Input {
+	checksSet := map[string]bool{}
+	for _, c := range doc.Checks {
+		checksSet[c] = true
+	}
+	input := Input{
+		Name:         ind.Name,
+		Surname:      ind.Surname,
+		DocumentPath: doc.Path,
+		ValidMonths:  doc.ValidMonths,
+		Model:        batch.Model,
+		OllamaURL:    batch.OllamaURL,
+	}
+	if checksSet["postal"] {
+		input.PostalCodes = ind.PostalCodes
+	}
+	return input
+}
+
+// EvaluateChecks évalue uniquement les checks demandés sur l'analyse,
+// en tenant compte du type de document détecté pour ignorer les checks non pertinents.
+func EvaluateChecks(analysis AnalysisResult, doc Document, ind Individual) DocResult {
+	checksSet := map[string]bool{}
+	for _, c := range doc.Checks {
+		checksSet[c] = true
+	}
+
+	isIdentityDoc := analysis.DocType == DocTypePassport || analysis.DocType == DocTypeID
+	isAddressDoc := analysis.DocType == DocTypeInvoice || analysis.DocType == DocTypeLetter
+
+	ok := true
+	var errors []string
+
+	if checksSet["name"] && !analysis.NameFound {
+		ok = false
+		errors = append(errors, fmt.Sprintf("Nom '%s' non trouvé", ind.Name))
+	}
+	if checksSet["surname"] && !analysis.SurnameFound {
+		ok = false
+		errors = append(errors, fmt.Sprintf("Prénom '%s' non trouvé", ind.Surname))
+	}
+	if checksSet["postal"] {
+		if isIdentityDoc {
+			analysis.PostalFound = true
+		} else if !analysis.PostalFound {
+			ok = false
+			errors = append(errors, fmt.Sprintf("Code postal %v non trouvé", ind.PostalCodes))
+		}
+	}
+	if checksSet["city"] && !isIdentityDoc {
+		cityFound := false
+		for _, city := range ind.Cities {
+			if strings.Contains(strings.ToUpper(analysis.RawText), strings.ToUpper(city)) {
+				cityFound = true
+				break
+			}
+		}
+		if !cityFound {
+			ok = false
+			errors = append(errors, fmt.Sprintf("Ville %v non trouvée", ind.Cities))
+		}
+	}
+	if checksSet["date"] {
+		if isIdentityDoc {
+			if !analysis.DateValid {
+				ok = false
+				if analysis.ExpiryDate != "" {
+					errors = append(errors, fmt.Sprintf("Document expiré (expiration : %s)", analysis.ExpiryDate))
+				} else {
+					errors = append(errors, "Document expiré ou date d'expiration non trouvée")
+				}
+			}
+		} else if !analysis.DateFound || !analysis.DateValid {
+			ok = false
+			if !analysis.DateFound {
+				errors = append(errors, "Date du document non trouvée")
+			} else {
+				errors = append(errors, "Document trop ancien")
+			}
+		}
+	}
+	if checksSet["birth_date"] && !isAddressDoc {
+		if ind.BirthDate == "" {
+			if analysis.BirthDate == "" {
+				ok = false
+				errors = append(errors, "Date de naissance non trouvée dans le document")
+			}
+		} else {
+			norm := func(s string) string {
+				s = strings.TrimSpace(s)
+				s = strings.ReplaceAll(s, " ", "/")
+				s = strings.ReplaceAll(s, "-", "/")
+				return strings.ToLower(s)
+			}
+			birthOK := analysis.BirthDate != "" && norm(analysis.BirthDate) == norm(ind.BirthDate)
+			if !birthOK {
+				ok = false
+				errors = append(errors, fmt.Sprintf(
+					"Date de naissance attendue '%s', trouvée '%s'",
+					ind.BirthDate, analysis.BirthDate))
+			}
+		}
+	}
+
+	analysis.Errors = errors
+	analysis.OK = ok
+
+	return DocResult{
+		DocumentID:   doc.ID,
+		Label:        doc.Label,
+		IndividualID: ind.ID,
+		Checks:       doc.Checks,
+		OK:           ok,
+		Errors:       errors,
+		Analysis:     analysis,
+	}
 }

@@ -1,4 +1,4 @@
-package main
+package docverify
 
 import (
 	"encoding/json"
@@ -18,7 +18,8 @@ func defaultOllamaURL() string {
 	return "http://localhost:8000"
 }
 
-func startServer() {
+// StartServer démarre le serveur HTTP docverify sur :8680.
+func StartServer() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/check", handleCheck)
 	http.HandleFunc("/batch", handleBatch)
@@ -86,7 +87,7 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	// Modèle et URL Ollama (optionnels, avec défauts)
 	model := r.FormValue("model")
 	if model == "" {
-		model = defaultModel
+		model = DefaultModel
 	}
 	ollamaURL := r.FormValue("ollama_url")
 	if ollamaURL == "" {
@@ -160,7 +161,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if batch.Model == "" {
-		batch.Model = defaultModel
+		batch.Model = DefaultModel
 	}
 	if batch.OllamaURL == "" {
 		batch.OllamaURL = defaultOllamaURL()
@@ -237,14 +238,14 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Analyse
-		input := buildInput(ind, doc, batch)
+		input := BuildInput(ind, doc, batch)
 		analysis := AnalyzeText(rawText, input)
 
 		// Supprimer le texte OCR brut (RGPD)
 		analysis.RawText = ""
 
 		// Évaluer les checks
-		res := evaluateChecks(analysis, doc, ind)
+		res := EvaluateChecks(analysis, doc, ind)
 		results = append(results, res)
 		if !res.OK {
 			allOK = false
