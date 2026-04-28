@@ -2,10 +2,11 @@
 
 `docverify` est un programme qui valide des documents administratifs (factures, CNI, passeports, justificatifs de domicile) via OCR + LLM.
 
+Documentation disponible sur le [wiki Gitea](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
+
 **Machine :** 
 
 Mac Mini M4 Pro (ARM64) - 12 CPUs — 48 GB RAM
-
 
 ## Prérequis
 
