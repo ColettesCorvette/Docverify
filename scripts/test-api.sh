@@ -8,7 +8,7 @@ set -e
 
 API="http://localhost:8680"
 SAMPLES="/Users/dev/Desktop/LLM/ocr/samples"
-MODEL="mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
+MODEL="mlx-community/gemma-4-e4b-it-4bit"
 OLLAMA="http://localhost:11434"
 
 # Couleurs
