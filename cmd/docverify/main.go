@@ -51,7 +51,7 @@ func runBatch(data []byte) {
 		batch.Model = dc.DefaultModel
 	}
 	if batch.OllamaURL == "" {
-		batch.OllamaURL = "http://localhost:11434"
+		batch.OllamaURL = dc.DefaultLLMURL()
 	}
 
 	indivIdx := map[string]dc.Individual{}
@@ -195,7 +195,7 @@ func runLegacy(data []byte) {
 		input.Model = dc.DefaultModel
 	}
 	if input.OllamaURL == "" {
-		input.OllamaURL = "http://localhost:11434"
+		input.OllamaURL = dc.DefaultLLMURL()
 	}
 	if err := validateInput(input); err != nil {
 		fmt.Fprintf(os.Stderr, "Input invalide: %v\n", err)

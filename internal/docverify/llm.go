@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const DefaultModel = "mlx-community/Qwen2-VL-2B-Instruct-4bit"
+const DefaultModel = "mlx-community/gemma-4-e4b-it-4bit"
 
 // --- Format OpenAI-compatible (vllm-mlx, vLLM, Ollama >= 0.4 via /v1) ------
 

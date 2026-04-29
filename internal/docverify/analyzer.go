@@ -545,6 +545,10 @@ type Document struct {
 }
 
 // BatchInput est le format d'entrée pour un batch (individus + documents).
+//
+// Note: le champ s'appelle OllamaURL et le tag JSON `ollama_url` est conservé
+// pour stabilité de l'API d'entrée — le code cible désormais n'importe quel
+// endpoint OpenAI-compatible (vllm-mlx, vLLM, Ollama >= 0.4 via /v1).
 type BatchInput struct {
 	Individuals []Individual `json:"individuals"`
 	Documents   []Document   `json:"documents"`

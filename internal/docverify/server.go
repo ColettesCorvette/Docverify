@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 )
 
-// defaultOllamaURL retourne l'URL de l'endpoint LLM (OpenAI-compatible) par défaut.
+// DefaultLLMURL retourne l'URL de l'endpoint LLM (OpenAI-compatible) par défaut.
 // Variable d'env : LLM_URL. Fallback : vllm-mlx local sur :8000.
-func defaultOllamaURL() string {
+// Utilisé à la fois par le serveur HTTP et le CLI pour rester cohérent.
+func DefaultLLMURL() string {
 	if url := os.Getenv("LLM_URL"); url != "" {
 		return url
 	}
@@ -23,7 +24,7 @@ func StartServer() {
 	http.HandleFunc("/health", handleHealth)
 	http.HandleFunc("/check", handleCheck)
 	http.HandleFunc("/batch", handleBatch)
-	log.Printf("Serveur docverify sur :8680 (LLM=%s)", defaultOllamaURL())
+	log.Printf("Serveur docverify sur :8680 (LLM=%s)", DefaultLLMURL())
 	log.Fatal(http.ListenAndServe(":8680", nil))
 }
 
@@ -91,7 +92,7 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	ollamaURL := r.FormValue("ollama_url")
 	if ollamaURL == "" {
-		ollamaURL = defaultOllamaURL()
+		ollamaURL = DefaultLLMURL()
 	}
 
 	// --- Pipeline OCR ---
@@ -164,7 +165,7 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		batch.Model = DefaultModel
 	}
 	if batch.OllamaURL == "" {
-		batch.OllamaURL = defaultOllamaURL()
+		batch.OllamaURL = DefaultLLMURL()
 	}
 
 	// Index individus
