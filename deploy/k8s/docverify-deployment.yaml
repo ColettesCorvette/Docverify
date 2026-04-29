@@ -24,11 +24,12 @@ spec:
         env:
         - name: LLM_URL
           value: "http://host.docker.internal:8000"
-        - name: RSA_PRIVATE_KEY
-          valueFrom:
-            secretKeyRef:
-              name: docverify-keys
-              key: rsa-private.pem
+        - name: RSA_PRIVATE_KEY_PATH
+          value: "/etc/docverify/keys/rsa-private.pem"
+        volumeMounts:
+        - name: rsa-key
+          mountPath: /etc/docverify/keys
+          readOnly: true
         livenessProbe:
           httpGet:
             path: /health
@@ -48,6 +49,14 @@ spec:
           limits:
             cpu: "2"
             memory: "1Gi"
+      volumes:
+      - name: rsa-key
+        secret:
+          secretName: docverify-keys
+          defaultMode: 0400
+          items:
+          - key: rsa-private.pem
+            path: rsa-private.pem
 ---
 apiVersion: v1
 kind: Service
