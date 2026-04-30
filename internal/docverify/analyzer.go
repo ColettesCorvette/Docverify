@@ -45,7 +45,12 @@ const minOCRChars = 30
 
 // --- Détection du type de document ---
 
-// Mots-clés par type de document
+// Mots-clés par type de document.
+//
+// TODO: ajouter une détection MRZ par regex `^P<[A-Z]{3}` pour reconnaître
+// n'importe quel passeport indépendamment de la langue. Cas réel : passeports
+// marocains (BEN AMAR) où le LLM ne transcrit pas "passport"/"passeport"
+// et où le doc tombe en doc_type=inconnu.
 var docTypeKeywords = map[DocType][]string{
 	DocTypePassport: {"passport", "passeport", "travel document", "mrz", "p<mar", "p<fra", "p<bel", "nationality", "nationalité", "date of expiry", "date d'expiration"},
 	DocTypeID: {
