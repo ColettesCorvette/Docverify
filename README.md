@@ -55,7 +55,7 @@ docker build -f deploy/Dockerfile -t docverify-docverify:latest .
 k3d cluster create mini-cluster -p "8680:8680@loadbalancer" -p "8001:8001@loadbalancer"
 k3d image import docverify-docverify:latest -c mini-cluster
 ```
-Les port mappings exposent directement `localhost:8680` (app) et `localhost:8001` (dashboard) sans nécessiter `kubectl port-forward` ni `kubectl proxy`.
+Les port mappings exposent directement `localhost:8680` le programme et `localhost:8001` [dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) sans nécessiter `kubectl port-forward` ni `kubectl proxy`.
 
 ### Vérifier
 
@@ -69,9 +69,7 @@ kubectl cluster-info
 
 ```bash
 source ~/vllm-mlx-env/bin/activate
-vllm-mlx serve mlx-community/gemma-4-e4b-it-4bit \
-  --mllm --host 0.0.0.0 --port 8000 \
-  --continuous-batching --max-num-seqs 5
+vllm-mlx serve mlx-community/gemma-4-e4b-it-4bit --mllm --host 0.0.0.0 --port 8000 --continuous-batching --max-num-seqs 5
 ```
 - `--mllm` : mode vision 
 - `--host 0.0.0.0` : exposer hors loopback pour que les pods K8s puissent y accéder via `host.docker.internal`
