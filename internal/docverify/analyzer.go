@@ -34,9 +34,14 @@ type AnalysisResult struct {
 	ExpiryDate string   `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
 	IssueDate  string   `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
 	BirthDate  string   `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
+	Unreadable bool     `json:"unreadable,omitempty"`  // document illisible, review humaine requise
 	Errors     []string `json:"errors,omitempty"`
 	RawText    string   `json:"raw_text,omitempty"`
 }
+
+// minOCRChars : seuil sous lequel on considère que l'OCR a échoué.
+// En dessous, le LLM a probablement renvoyé un message d'erreur ou rien.
+const minOCRChars = 30
 
 // --- Détection du type de document ---
 
@@ -400,7 +405,16 @@ func searchName(text, name, surname string) (bool, bool, string) {
 func AnalyzeText(text string, input Input) AnalysisResult {
 	result := AnalysisResult{RawText: text}
 
-	// 0. Détection du type de document
+	// 0. Détection précoce d'un document illisible : OCR vide ou trop court.
+	if len(strings.TrimSpace(text)) < minOCRChars {
+		result.DocType = DocTypeUnknown
+		result.Unreadable = true
+		result.OK = false
+		result.Errors = append(result.Errors, "Document illisible — review manuelle requise")
+		return result
+	}
+
+	// 1. Détection du type de document
 	result.DocType = DetectDocType(text)
 
 	// 1. Recherche du nom (et prénom si fourni)
@@ -503,6 +517,15 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 	}
 
 	surnameOK := input.Surname == "" || result.SurnameFound
+
+	// Document illisible : type inconnu ET aucun signal exploitable.
+	// On ne refuse pas sèchement : on marque pour review humaine côté Regia.
+	if result.DocType == DocTypeUnknown && !result.NameFound && !result.PostalFound && !result.DateFound {
+		result.Unreadable = true
+		result.OK = false
+		result.Errors = append(result.Errors, "Document illisible — review manuelle requise")
+		return result
+	}
 
 	switch result.DocType {
 	case DocTypePassport, DocTypeID:

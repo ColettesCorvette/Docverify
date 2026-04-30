@@ -61,13 +61,19 @@ func RunLLM(imagePath, model, llmURL string) (string, error) {
 			"  → Vérifiez : curl %s/v1/models", llmURL, err, llmURL)
 	}
 
-	imgB64, err := encodeImageBase64(imagePath)
+	processedPath, cleanup, _ := preprocessForLLM(imagePath)
+	defer cleanup()
+	if processedPath != imagePath {
+		fmt.Println("   Prétraitement : ImageMagick → upscale 200% + unsharp + despeckle")
+	}
+
+	imgB64, err := encodeImageBase64(processedPath)
 	if err != nil {
 		return "", fmt.Errorf("encodage image: %w", err)
 	}
 	fmt.Printf("   Image encodée : %.1f Ko\n", float64(len(imgB64))/1024)
 
-	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeFromExt(imagePath), imgB64)
+	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeFromExt(processedPath), imgB64)
 
 	payload := chatRequest{
 		Model: model,

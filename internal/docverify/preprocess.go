@@ -52,3 +52,43 @@ func isImageMagickAvailable() bool {
 	_, err := exec.LookPath("convert")
 	return err == nil
 }
+
+// preprocessForLLM améliore une image avant l'envoi au LLM vision.
+// Pipeline orienté lisibilité visuelle, pas binarisation :
+//   - resize 200% : upscale pour rendre les petits caractères MRZ/dates lisibles
+//   - unsharp 0x1 : sharpening léger
+//   - despeckle : retire les artefacts JPEG sans dégrader le texte
+//
+// Retourne l'image originale si ImageMagick est absent ou si la conversion échoue.
+func preprocessForLLM(imagePath string) (string, func(), error) {
+	if !isImageMagickAvailable() {
+		return imagePath, func() {}, nil
+	}
+
+	tmpDir, err := os.MkdirTemp("", "docverify-llm-preprocess-*")
+	if err != nil {
+		return imagePath, func() {}, nil
+	}
+
+	ext := filepath.Ext(imagePath)
+	if ext == "" {
+		ext = ".png"
+	}
+	outPath := filepath.Join(tmpDir, "llm"+ext)
+
+	cmd := exec.Command("convert",
+		imagePath,
+		"-resize", "200%",
+		"-unsharp", "0x1",
+		"-despeckle",
+		outPath,
+	)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("   ⚠️  Prétraitement LLM échoué: %s\n", strings.TrimSpace(string(out)))
+		os.RemoveAll(tmpDir)
+		return imagePath, func() {}, nil
+	}
+
+	return outPath, func() { os.RemoveAll(tmpDir) }, nil
+}
