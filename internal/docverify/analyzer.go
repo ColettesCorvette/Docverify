@@ -40,7 +40,7 @@ type AnalysisResult struct {
 
 // --- Détection du type de document ---
 
-// Mots-clés par type de document (cherchés dans le texte OCR, insensible à la casse)
+// Mots-clés par type de document
 var docTypeKeywords = map[DocType][]string{
 	DocTypePassport: {"passport", "passeport", "travel document", "mrz", "p<mar", "p<fra", "p<bel", "nationality", "nationalité", "date of expiry", "date d'expiration"},
 	DocTypeID: {
@@ -99,7 +99,7 @@ func normalizeFrenchDate(s string) string {
 }
 
 func parseDate(token string) (time.Time, bool) {
-	// Normaliser d'abord les formats non-standard (espaces, 8 chiffres collés)
+	// Normaliser d'abord les formats non-standard
 	// avant la normalisation des mois français
 	token = normalizeRawDate(token)
 	normalized := normalizeFrenchDate(token)
@@ -117,11 +117,11 @@ var dateTokenRe = regexp.MustCompile(
 	`\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{4})\b` +
 		// YYYY/MM/DD ou YYYY-MM-DD
 		`|\b(\d{4}[/\-]\d{2}[/\-]\d{2})\b` +
-		// DD MM YYYY (espaces — ex: CNI française "08 02 2020")
+		// DD MM YYYY
 		`|\b(\d{2}\s+\d{2}\s+\d{4})\b` +
-		// DDMMYYYY collé (ex: "24042035")
+		// DDMMYYYY collé
 		`|\b(\d{2})(\d{2})(\d{4})\b` +
-		// DD mois YYYY (mois en toutes lettres)
+		// DD mois YYYY
 		`|\b(\d{1,2}\s+(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b`,
 )
 
@@ -146,9 +146,6 @@ func extractAllDates(text string) []time.Time {
 
 // normalizeRawDate convertit les formats de date non-standard en DD/MM/YYYY
 // pour faciliter le parsing.
-//
-//	"08 02 2020" → "19/11/2018"
-//	"24042035"   → "24/04/2035"
 func normalizeRawDate(s string) string {
 	s = strings.TrimSpace(s)
 	// DD MM YYYY (avec espaces)
@@ -158,7 +155,7 @@ func normalizeRawDate(s string) string {
 			return parts[0] + "/" + parts[1] + "/" + parts[2]
 		}
 	}
-	// DDMMYYYY (8 chiffres collés)
+	// DDMMYYYY
 	if collapsedRe.MatchString(s) {
 		return s[0:2] + "/" + s[2:4] + "/" + s[4:]
 	}
@@ -188,7 +185,7 @@ func extractAllDatesWithRaw(text string) []struct {
 			continue
 		}
 		seen[raw] = true
-		// Normaliser avant parsing (espaces → /, 8 chiffres → DD/MM/YYYY)
+		// Normaliser avant parsing
 		normalized := normalizeRawDate(raw)
 		if t, ok := parseDate(normalized); ok {
 			result = append(result, struct {
@@ -307,13 +304,22 @@ func extractDateForPassport(text string) (docDate time.Time, rawDate, issueRaw, 
 		}
 	}
 
-	// Date de référence = émission si trouvée, sinon première date disponible
-	if rawDate == "" {
-		rawDate = entries[0].Raw
-		docDate = entries[0].T
-	}
-
+	// Date de référence = émission si trouvée. Pas de fallback sur entries[0]
+	// car c'est souvent la date de naissance (causerait DocDate == BirthDate).
+	// Si pas d'émission, la validité s'appuie sur ExpiryDate
 	return docDate, rawDate, issueRaw, expiryRaw, birthRaw, true
+}
+
+// formatDate normalise une date brute vers DD/MM/YYYY pour l'affichage.
+// Si non parseable, renvoie la chaîne brute
+func formatDate(raw string) string {
+	if raw == "" {
+		return ""
+	}
+	if t, ok := parseDate(raw); ok {
+		return t.Format("02/01/2006")
+	}
+	return raw
 }
 
 // extractDate retourne la première date trouvée (pour factures/courriers).
@@ -444,15 +450,15 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 			result.Errors = append(result.Errors, "Aucune date trouvée dans le document")
 		} else {
 			result.DateFound = true
-			result.DocDate = rawDate
+			result.DocDate = formatDate(rawDate)
 			if issueRaw != "" {
-				result.IssueDate = issueRaw
+				result.IssueDate = formatDate(issueRaw)
 			}
 			if birthRaw != "" {
-				result.BirthDate = birthRaw
+				result.BirthDate = formatDate(birthRaw)
 			}
 			if expiryRaw != "" {
-				result.ExpiryDate = expiryRaw
+				result.ExpiryDate = formatDate(expiryRaw)
 				// Validité passeport : date d'expiration dans le futur
 				expiryTime, ok := func() (time.Time, bool) {
 					t, ok := parseDate(expiryRaw)
@@ -484,7 +490,7 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 			result.Errors = append(result.Errors, "Aucune date trouvée dans le document")
 		} else {
 			result.DateFound = true
-			result.DocDate = rawDate
+			result.DocDate = formatDate(rawDate)
 			limit := time.Now().AddDate(0, -validMonths, 0)
 			if docDate.After(limit) {
 				result.DateValid = true
