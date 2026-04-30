@@ -16,7 +16,7 @@ import (
 
 const DefaultModel = "mlx-community/gemma-4-e4b-it-4bit"
 
-// --- Format OpenAI-compatible (vllm-mlx, vLLM, Ollama >= 0.4 via /v1) ------
+// --- Format OpenAI-compatible (vllm-mlx, vLLM, etc. via /v1) ---------------
 
 type chatMessage struct {
 	Role    string        `json:"role"`
@@ -53,12 +53,12 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
-// RunOllama — nom historique conservé. Cible désormais un endpoint
-// OpenAI-compatible (vllm-mlx, vLLM upstream, Ollama /v1/*).
-func RunOllama(imagePath, model, ollamaURL string) (string, error) {
-	if err := pingOllama(ollamaURL); err != nil {
+// RunLLM appelle l'endpoint OpenAI-compatible (vllm-mlx, vLLM, etc.)
+// pour transcrire l'image fournie.
+func RunLLM(imagePath, model, llmURL string) (string, error) {
+	if err := pingLLM(llmURL); err != nil {
 		return "", fmt.Errorf("Endpoint LLM non joignable (%s): %w\n"+
-			"  → Vérifiez : curl %s/v1/models", ollamaURL, err, ollamaURL)
+			"  → Vérifiez : curl %s/v1/models", llmURL, err, llmURL)
 	}
 
 	imgB64, err := encodeImageBase64(imagePath)
@@ -91,7 +91,7 @@ func RunOllama(imagePath, model, ollamaURL string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
 	defer cancel()
 
-	apiURL := strings.TrimRight(ollamaURL, "/") + "/v1/chat/completions"
+	apiURL := strings.TrimRight(llmURL, "/") + "/v1/chat/completions"
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return "", err
@@ -157,11 +157,11 @@ func spinner(done <-chan struct{}) {
 	}
 }
 
-// pingOllama vérifie que l'endpoint LLM répond sur /v1/models.
-func pingOllama(ollamaURL string) error {
+// pingLLM vérifie que l'endpoint LLM répond sur /v1/models.
+func pingLLM(llmURL string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	url := strings.TrimRight(ollamaURL, "/") + "/v1/models"
+	url := strings.TrimRight(llmURL, "/") + "/v1/models"
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return err

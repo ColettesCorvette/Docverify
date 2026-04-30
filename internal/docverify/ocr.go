@@ -50,12 +50,12 @@ func ocrQuality(text string) float64 {
 // Méthode : ratio de pixels blancs (>78% de luminosité).
 //
 //	Documents à fond blanc (factures, CNI) → ratio élevé  → Tesseract OK
-//	Documents à fond guilloché (passeports) → ratio faible → Ollama direct
+//	Documents à fond guilloché (passeports) → ratio faible → LLM direct
 //
 // Seuils calibrés sur exemples réels :
 //
 //	CNI française : 83% de pixels blancs  → Tesseract
-//	Passeport MAR : 3.5% de pixels blancs → Ollama
+//	Passeport MAR : 3.5% de pixels blancs → LLM
 const whitePixelThreshold = 0.25 // en dessous → fond trop chargé pour Tesseract
 
 func hasComplexBackground(imagePath string) bool {
@@ -79,27 +79,27 @@ func hasComplexBackground(imagePath string) bool {
 	complex := ratio < whitePixelThreshold
 	fmt.Printf("   Fond image     : %.0f%% pixels blancs → %s\n",
 		ratio*100,
-		map[bool]string{true: "complexe → Ollama", false: "simple → Tesseract"}[complex])
+		map[bool]string{true: "complexe → LLM", false: "simple → Tesseract"}[complex])
 	return complex
 }
 
 // ExtractText est le point d'entrée pour l'OCR d'une image.
 // Pipeline adaptatif :
-//  0. Détection fond complexe → Ollama direct (passeports, CNI)
+//  0. Détection fond complexe → LLM direct (passeports, CNI)
 //  1. Tesseract sur image brute (meilleur PSM parmi 3,4,6,11)
 //  2. Tesseract sur image prétraitée ImageMagick
-//  3. Ollama en fallback final
-func ExtractText(imagePath, model, ollamaURL string) (string, error) {
+//  3. LLM en fallback final
+func ExtractText(imagePath, model, llmURL string) (string, error) {
 
 	// Étape 0 : détecter si le fond est complexe (guilloché, texturé)
 	if hasComplexBackground(imagePath) {
-		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → Ollama direct")
-		return RunOllama(imagePath, model, ollamaURL)
+		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
+		return RunLLM(imagePath, model, llmURL)
 	}
 
 	if !tesseractAvailable() {
-		fmt.Println("   Moteur OCR    : Ollama (Tesseract absent — brew install tesseract tesseract-lang)")
-		return RunOllama(imagePath, model, ollamaURL)
+		fmt.Println("   Moteur OCR    : LLM (Tesseract absent — brew install tesseract tesseract-lang)")
+		return RunLLM(imagePath, model, llmURL)
 	}
 
 	// Étape 1 : Tesseract brut, meilleur PSM
@@ -124,9 +124,9 @@ func ExtractText(imagePath, model, ollamaURL string) (string, error) {
 		fmt.Printf("   ⚠️  Qualité insuffisante après prétraitement (%.0f%%)\n", q2*100)
 	}
 
-	// Étape 3 : fallback Ollama
-	fmt.Println("   Bascule sur Ollama (document complexe)")
-	return RunOllama(imagePath, model, ollamaURL)
+	// Étape 3 : fallback LLM
+	fmt.Println("   Bascule sur LLM (document complexe)")
+	return RunLLM(imagePath, model, llmURL)
 }
 
 // bestTesseractResult essaie plusieurs modes PSM et retourne le texte

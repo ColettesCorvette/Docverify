@@ -545,15 +545,12 @@ type Document struct {
 }
 
 // BatchInput est le format d'entrée pour un batch (individus + documents).
-//
-// Note: le champ s'appelle OllamaURL et le tag JSON `ollama_url` est conservé
-// pour stabilité de l'API d'entrée — le code cible désormais n'importe quel
-// endpoint OpenAI-compatible (vllm-mlx, vLLM, Ollama >= 0.4 via /v1).
+// LLMURL cible un endpoint OpenAI-compatible (vllm-mlx, vLLM, Ollama via /v1).
 type BatchInput struct {
 	Individuals []Individual `json:"individuals"`
 	Documents   []Document   `json:"documents"`
 	Model       string       `json:"model"`
-	OllamaURL   string       `json:"ollama_url"`
+	LLMURL      string       `json:"llm_url"`
 }
 
 // Input est l'ancien format mono-document (rétrocompatibilité).
@@ -564,7 +561,7 @@ type Input struct {
 	PostalCodes  []string `json:"postal_codes"`
 	DocumentPath string   `json:"document_path"`
 	Model        string   `json:"model"`
-	OllamaURL    string   `json:"ollama_url"`
+	LLMURL       string   `json:"llm_url"`
 }
 
 // ReferentAddress stocke l'adresse validée du référent pour propagation.
@@ -597,7 +594,7 @@ func BuildInput(ind Individual, doc Document, batch BatchInput) Input {
 		DocumentPath: doc.Path,
 		ValidMonths:  doc.ValidMonths,
 		Model:        batch.Model,
-		OllamaURL:    batch.OllamaURL,
+		LLMURL:       batch.LLMURL,
 	}
 	if checksSet["postal"] {
 		input.PostalCodes = ind.PostalCodes

@@ -9,9 +9,9 @@ import (
 	"path/filepath"
 )
 
-// DefaultLLMURL retourne l'URL de l'endpoint LLM (OpenAI-compatible) par défaut.
+// DefaultLLMURL retourne l'URL de l'endpoint LLM OpenAI-compatible par défaut.
 // Variable d'env : LLM_URL. Fallback : vllm-mlx local sur :8000.
-// Utilisé à la fois par le serveur HTTP et le CLI pour rester cohérent.
+// Utilisé à la fois par le serveur HTTP et le CLI.
 func DefaultLLMURL() string {
 	if url := os.Getenv("LLM_URL"); url != "" {
 		return url
@@ -20,15 +20,26 @@ func DefaultLLMURL() string {
 }
 
 // StartServer démarre le serveur HTTP docverify sur :8680.
+//
+// Utilise le ServeMux Go 1.22 (patterns "METHOD /path/{var}").
+// V1 sans AuthMiddleware ni RBAC : docverify est un service interne
+// appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
 func StartServer() {
-	http.HandleFunc("/health", handleHealth)
-	http.HandleFunc("/check", handleCheck)
-	http.HandleFunc("/batch", handleBatch)
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("POST /api/v1/supporting-documents", handlePostSupportingDocument)
+
+	// --- Routes legacy (dev / testclient / bench) -------------------------
+	// Décommenter pour réactiver les anciens points d'entrée multipart.
+	// mux.HandleFunc("POST /check", handleCheck)
+	// mux.HandleFunc("POST /batch", handleBatch)
+
 	log.Printf("Serveur docverify sur :8680 (LLM=%s)", DefaultLLMURL())
-	log.Fatal(http.ListenAndServe(":8680", nil))
+	log.Fatal(http.ListenAndServe(":8680", mux))
 }
 
-// --- Health check (GET /health) -------------------------------------------
+// --- Health check ---------------------------------------------------------
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -36,7 +47,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 
-// writeJSONError renvoie une erreur au format JSON (compatible jq)
+// writeJSONError renvoie une erreur au format JSON.
 func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
@@ -46,22 +57,102 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	})
 }
 
-// --- Check single document (POST /check) ----------------------------------
+// --- API v1 : Supporting Documents ----------------------------------------
 
+// POST /api/v1/supporting-documents — upload + analyse d'un justificatif.
+//
+// Route principale appelée par Regia. Reçoit un multipart, lance le pipeline
+// OCR, renvoie le verdict.
+//
+// Champs multipart attendus :
+//   - doc          : le fichier (PDF ou image)
+//   - name         : nom attendu (fourni par Regia depuis sa BDD)
+//   - surname      : prénom attendu (idem)
+//   - postal_code  : code postal attendu (idem)
+//   - model        : override du modèle LLM (optionnel)
+//   - llm_url      : override de l'endpoint LLM (optionnel)
+func handlePostSupportingDocument(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
+		return
+	}
+
+	file, header, err := r.FormFile("doc")
+	if err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")
+		return
+	}
+	defer file.Close()
+
+	destinationPath := filepath.Join("/tmp", header.Filename)
+	dst, err := os.Create(destinationPath)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
+		return
+	}
+	if _, err := io.Copy(dst, file); err != nil {
+		dst.Close()
+		os.Remove(destinationPath)
+		writeJSONError(w, http.StatusInternalServerError, "Erreur sauvegarde fichier")
+		return
+	}
+	dst.Close()
+	defer os.Remove(destinationPath)
+
+	model := r.FormValue("model")
+	if model == "" {
+		model = DefaultModel
+	}
+	llmURL := r.FormValue("llm_url")
+	if llmURL == "" {
+		llmURL = DefaultLLMURL()
+	}
+
+	var rawText string
+	var extractErr error
+	if IsPDF(destinationPath) {
+		rawText, extractErr = ExtractPDF(destinationPath, model, llmURL)
+	} else {
+		rawText, extractErr = ExtractText(destinationPath, model, llmURL)
+	}
+	if extractErr != nil {
+		writeJSONError(w, http.StatusInternalServerError, "Erreur OCR: "+extractErr.Error())
+		return
+	}
+
+	input := Input{
+		Name:        r.FormValue("name"),
+		Surname:     r.FormValue("surname"),
+		PostalCodes: []string{r.FormValue("postal_code")},
+		ValidMonths: 3,
+		Model:       model,
+		LLMURL:      llmURL,
+	}
+	result := AnalyzeText(rawText, input)
+	result.RawText = "" // RGPD
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// --- Routes legacy (dev) --------------------------------------------------
+//
+// handleCheck et handleBatch sont conservés pour le dev local (testclient,
+// bench-batch). Désenregistrés du mux par défaut — voir StartServer.
+//
+/*
 func handleCheck(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeJSONError(w, http.StatusMethodNotAllowed, "Méthode non autorisée")
 		return
 	}
 
-	// Parser le formulaire (max 10 Mo)
 	err := r.ParseMultipartForm(10 << 20)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
 		return
 	}
 
-	// Récupérer le fichier
 	file, header, err := r.FormFile("doc")
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Erreur lors de la récupération du fichier")
@@ -69,7 +160,6 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	// Sauvegarder dans /tmp
 	destinationPath := filepath.Join("/tmp", header.Filename)
 	dst, err := os.Create(destinationPath)
 	if err != nil {
@@ -85,27 +175,24 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 	}
 	dst.Close()
 
-	// Modèle et URL Ollama (optionnels, avec défauts)
 	model := r.FormValue("model")
 	if model == "" {
 		model = DefaultModel
 	}
-	ollamaURL := r.FormValue("ollama_url")
-	if ollamaURL == "" {
-		ollamaURL = DefaultLLMURL()
+	llmURL := r.FormValue("llm_url")
+	if llmURL == "" {
+		llmURL = DefaultLLMURL()
 	}
 
-	// --- Pipeline OCR ---
 	var rawText string
 	var extractErr error
 
 	if IsPDF(destinationPath) {
-		rawText, extractErr = ExtractPDF(destinationPath, model, ollamaURL)
+		rawText, extractErr = ExtractPDF(destinationPath, model, llmURL)
 	} else {
-		rawText, extractErr = ExtractText(destinationPath, model, ollamaURL)
+		rawText, extractErr = ExtractText(destinationPath, model, llmURL)
 	}
 
-	// Nettoyage du fichier temporaire
 	os.Remove(destinationPath)
 
 	if extractErr != nil {
@@ -113,45 +200,32 @@ func handleCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// --- Analyse ---
 	input := Input{
 		Name:        r.FormValue("name"),
 		Surname:     r.FormValue("surname"),
 		PostalCodes: []string{r.FormValue("postal_code")},
 		ValidMonths: 3,
 		Model:       model,
-		OllamaURL:   ollamaURL,
+		LLMURL:      llmURL,
 	}
 
 	result := AnalyzeText(rawText, input)
-
-	// Supprimer le texte OCR brut de la réponse (RGPD)
 	result.RawText = ""
 
-	// --- Réponse JSON ---
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
 }
 
-// --- Batch check (POST /batch) --------------------------------------------
-
 func handleBatch(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		writeJSONError(w, http.StatusMethodNotAllowed, "Méthode non autorisée")
-		return
-	}
-
-	// Parser le formulaire (max 50 Mo pour plusieurs fichiers)
 	err := r.ParseMultipartForm(50 << 20)
 	if err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
 		return
 	}
 
-	// Récupérer le JSON de configuration batch
 	configJSON := r.FormValue("config")
 	if configJSON == "" {
-		writeJSONError(w, http.StatusBadRequest, "Champ 'config' requis (JSON batch)")
+		writeJSONError(w, http.StatusBadRequest, "Champ 'config' requis JSON batch")
 		return
 	}
 
@@ -164,18 +238,16 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 	if batch.Model == "" {
 		batch.Model = DefaultModel
 	}
-	if batch.OllamaURL == "" {
-		batch.OllamaURL = DefaultLLMURL()
+	if batch.LLMURL == "" {
+		batch.LLMURL = DefaultLLMURL()
 	}
 
-	// Index individus
 	indivIdx := map[string]Individual{}
 	for _, ind := range batch.Individuals {
 		indivIdx[ind.ID] = ind
 	}
 
-	// Récupérer les fichiers uploadés et les sauvegarder dans /tmp
-	savedFiles := map[string]string{} // docID → chemin temporaire
+	savedFiles := map[string]string{}
 	for _, doc := range batch.Documents {
 		file, header, err := r.FormFile("doc_" + doc.ID)
 		if err != nil {
@@ -201,7 +273,6 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		savedFiles[doc.ID] = tmpPath
 	}
 
-	// --- Pipeline pour chaque document ---
 	var results []DocResult
 	allOK := true
 
@@ -212,16 +283,14 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		ind := indivIdx[doc.Individual]
 		docPath := savedFiles[doc.ID]
 
-		// OCR
 		var rawText string
 		var extractErr error
 		if IsPDF(docPath) {
-			rawText, extractErr = ExtractPDF(docPath, batch.Model, batch.OllamaURL)
+			rawText, extractErr = ExtractPDF(docPath, batch.Model, batch.LLMURL)
 		} else {
-			rawText, extractErr = ExtractText(docPath, batch.Model, batch.OllamaURL)
+			rawText, extractErr = ExtractText(docPath, batch.Model, batch.LLMURL)
 		}
 
-		// Nettoyage du fichier temporaire
 		os.Remove(docPath)
 
 		if extractErr != nil {
@@ -238,14 +307,10 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Analyse
 		input := BuildInput(ind, doc, batch)
 		analysis := AnalyzeText(rawText, input)
-
-		// Supprimer le texte OCR brut (RGPD)
 		analysis.RawText = ""
 
-		// Évaluer les checks
 		res := EvaluateChecks(analysis, doc, ind)
 		results = append(results, res)
 		if !res.OK {
@@ -253,15 +318,14 @@ func handleBatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Nettoyage des fichiers restants
 	for _, path := range savedFiles {
 		os.Remove(path)
 	}
 
-	// --- Réponse JSON ---
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
 		"ok":      allOK,
 		"results": results,
 	})
 }
+*/

@@ -50,8 +50,8 @@ func runBatch(data []byte) {
 	if batch.Model == "" {
 		batch.Model = dc.DefaultModel
 	}
-	if batch.OllamaURL == "" {
-		batch.OllamaURL = dc.DefaultLLMURL()
+	if batch.LLMURL == "" {
+		batch.LLMURL = dc.DefaultLLMURL()
 	}
 
 	indivIdx := map[string]dc.Individual{}
@@ -121,10 +121,10 @@ func runBatch(data []byte) {
 		var extractErr error
 		if dc.IsPDF(doc.Path) {
 			fmt.Println("│  📄 Traitement PDF...")
-			rawText, extractErr = dc.ExtractPDF(doc.Path, batch.Model, batch.OllamaURL)
+			rawText, extractErr = dc.ExtractPDF(doc.Path, batch.Model, batch.LLMURL)
 		} else {
 			fmt.Println("│  🖼️  Traitement image...")
-			rawText, extractErr = dc.ExtractText(doc.Path, batch.Model, batch.OllamaURL)
+			rawText, extractErr = dc.ExtractText(doc.Path, batch.Model, batch.LLMURL)
 		}
 
 		if extractErr != nil {
@@ -194,8 +194,8 @@ func runLegacy(data []byte) {
 	if input.Model == "" {
 		input.Model = dc.DefaultModel
 	}
-	if input.OllamaURL == "" {
-		input.OllamaURL = dc.DefaultLLMURL()
+	if input.LLMURL == "" {
+		input.LLMURL = dc.DefaultLLMURL()
 	}
 	if err := validateInput(input); err != nil {
 		fmt.Fprintf(os.Stderr, "Input invalide: %v\n", err)
@@ -210,16 +210,16 @@ func runLegacy(data []byte) {
 	}
 	fmt.Printf("   Codes postaux  : %v\n", input.PostalCodes)
 	fmt.Printf("   Validité       : %d mois\n", input.ValidMonths)
-	fmt.Printf("   Modèle Ollama  : %s\n\n", input.Model)
+	fmt.Printf("   Modèle LLM     : %s\n\n", input.Model)
 
 	var rawText string
 	var extractErr error
 	if dc.IsPDF(input.DocumentPath) {
 		fmt.Println("📄 Traitement PDF...")
-		rawText, extractErr = dc.ExtractPDF(input.DocumentPath, input.Model, input.OllamaURL)
+		rawText, extractErr = dc.ExtractPDF(input.DocumentPath, input.Model, input.LLMURL)
 	} else {
 		fmt.Println("🖼️  Traitement image...")
-		rawText, extractErr = dc.ExtractText(input.DocumentPath, input.Model, input.OllamaURL)
+		rawText, extractErr = dc.ExtractText(input.DocumentPath, input.Model, input.LLMURL)
 	}
 	if extractErr != nil {
 		fmt.Fprintf(os.Stderr, "Erreur extraction: %v\n", extractErr)

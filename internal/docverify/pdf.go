@@ -15,8 +15,8 @@ const minTextChars = 50
 // ExtractPDF est le point d'entrée pour les PDF.
 // Détecte automatiquement si le PDF est texte ou scanné :
 //   - PDF texte  → pdftotext (rapide, parfait)
-//   - PDF scanné → pdftoppm + Tesseract/Ollama
-func ExtractPDF(pdfPath, model, ollamaURL string) (string, error) {
+//   - PDF scanné → pdftoppm + Tesseract/LLM
+func ExtractPDF(pdfPath, model, llmURL string) (string, error) {
 	// 1. Tenter pdftotext en premier
 	if text, ok := tryPDFToText(pdfPath); ok {
 		fmt.Println("   Type PDF      : texte natif (pdftotext)")
@@ -32,7 +32,7 @@ func ExtractPDF(pdfPath, model, ollamaURL string) (string, error) {
 	defer cleanup()
 	fmt.Printf("   Image générée : %s\n", imgPath)
 
-	return ExtractText(imgPath, model, ollamaURL)
+	return ExtractText(imgPath, model, llmURL)
 }
 
 // tryPDFToText tente d'extraire le texte via pdftotext.
