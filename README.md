@@ -1,6 +1,6 @@
 # docverify
 
-`docverify` est un programme qui valide des documents administratifs (factures, CNI, passeports, justificatifs de domicile) via OCR + LLM.
+`docverify` est un service Go d'analyse automatisée de justificatifs administratifs (factures, CNI, passeports, justificatifs de domicile) via OCR + LLM multimodal, déployé sur Kubernetes et destiné à être intégré au back-office Regia.
 
 Documentation disponible sur le [wiki Gitea](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
 
@@ -69,7 +69,7 @@ kubectl cluster-info
 
 ```bash
 source ~/vllm-mlx-env/bin/activate
-vllm-mlx serve mlx-community/gemma-4-e4b-it-4bit \
+vllm-mlx serve mlx-community/Qwen2.5-VL-32B-Instruct-4bit \
   --mllm --host 0.0.0.0 --port 8000 \
   --continuous-batching --max-num-seqs 5
 ```
