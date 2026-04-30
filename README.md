@@ -118,7 +118,7 @@ curl http://localhost:8680/health
 ┌─────────────────────────── Host Mac ────────────────────────────┐
 │                                                                  │
 │  localhost:8680 ──┐                ┌── vllm-mlx :8000            │
-│  localhost:8001 ──┤                │   (Gemma-4 e4b, MLX)        │
+│  localhost:8001 ──┤                │   (Qwen2.5-VL-32B, MLX)     │
 │                   │                │                             │
 │  ┌────────────────▼────────────────▼──────────────────────────┐ │
 │  │  Colima VM (k3d bridge 172.19.0.0/16)                      │ │
