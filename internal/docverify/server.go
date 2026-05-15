@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"path/filepath"
 )
 
 // DefaultLLMURL retourne l'URL de l'endpoint LLM OpenAI-compatible par défaut.
@@ -21,21 +20,25 @@ func DefaultLLMURL() string {
 
 // StartServer démarre le serveur HTTP docverify sur :8680.
 //
-// Utilise le ServeMux Go 1.22 (patterns "METHOD /path/{var}").
+// Initialise la queue Redis et son worker pool, puis enregistre les routes.
 // V1 sans AuthMiddleware ni RBAC : docverify est un service interne
-// appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
+// appelé uniquement par Regia via le réseau K8s. À ajouter pour la V2.
 func StartServer() {
-	mux := http.NewServeMux()
+	queue, err := NewQueue(DefaultRedisURL(), DefaultWorkers())
+	if err != nil {
+		log.Fatalf("Init queue Redis : %v", err)
+	}
 
+	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handleHealth)
-	mux.HandleFunc("POST /api/v1/supporting-documents", handlePostSupportingDocument)
+	mux.HandleFunc("POST /api/v1/supporting-documents", makeSupportingDocumentHandler(queue))
 
 	// --- Routes legacy (dev / testclient / bench) -------------------------
 	// Décommenter pour réactiver les anciens points d'entrée multipart.
 	// mux.HandleFunc("POST /check", handleCheck)
 	// mux.HandleFunc("POST /batch", handleBatch)
 
-	log.Printf("Serveur docverify sur :8680 (LLM=%s)", DefaultLLMURL())
+	log.Printf("Serveur docverify sur :8680 (LLM=%s, REDIS=%s)", DefaultLLMURL(), DefaultRedisURL())
 	log.Fatal(http.ListenAndServe(":8680", mux))
 }
 
@@ -59,80 +62,71 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 
 // --- API v1 : Supporting Documents ----------------------------------------
 
-// POST /api/v1/supporting-documents — upload + analyse d'un justificatif.
+// makeSupportingDocumentHandler construit le handler de la route principale en
+// capturant la queue par closure. Le handler sauvegarde le fichier reçu puis
+// délègue l'exécution OCR + analyse à un worker via Redis.
 //
-// Route principale appelée par Regia. Reçoit un multipart, lance le pipeline
-// OCR, renvoie le verdict.
-//
-// Champs multipart attendus :
-//   - doc          : le fichier (PDF ou image)
-//   - name         : nom attendu (fourni par Regia depuis sa BDD)
-//   - surname      : prénom attendu (idem)
-//   - postal_code  : code postal attendu (idem)
-//   - model        : override du modèle LLM (optionnel)
-//   - llm_url      : override de l'endpoint LLM (optionnel)
-func handlePostSupportingDocument(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
-		return
-	}
+// Route principale appelée par Regia. Champs multipart attendus :
+//   - doc          : le fichier PDF ou image
+//   - name         : nom attendu fourni par Regia depuis sa BDD
+//   - surname      : prénom attendu, idem
+//   - postal_code  : code postal attendu, idem
+//   - model        : override du modèle LLM, optionnel
+//   - llm_url      : override de l'endpoint LLM, optionnel
+func makeSupportingDocumentHandler(queue *Queue) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
+			return
+		}
 
-	file, header, err := r.FormFile("doc")
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")
-		return
-	}
-	defer file.Close()
+		file, header, err := r.FormFile("doc")
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")
+			return
+		}
+		defer file.Close()
 
-	destinationPath := filepath.Join("/tmp", header.Filename)
-	dst, err := os.Create(destinationPath)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
-		return
-	}
-	if _, err := io.Copy(dst, file); err != nil {
-		dst.Close()
-		os.Remove(destinationPath)
-		writeJSONError(w, http.StatusInternalServerError, "Erreur sauvegarde fichier")
-		return
-	}
-	dst.Close()
-	defer os.Remove(destinationPath)
+		content, err := io.ReadAll(file)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Erreur lecture fichier")
+			return
+		}
 
-	model := r.FormValue("model")
-	if model == "" {
-		model = DefaultModel
-	}
-	llmURL := r.FormValue("llm_url")
-	if llmURL == "" {
-		llmURL = DefaultLLMURL()
-	}
+		model := r.FormValue("model")
+		if model == "" {
+			model = DefaultModel
+		}
+		llmURL := r.FormValue("llm_url")
+		if llmURL == "" {
+			llmURL = DefaultLLMURL()
+		}
+		log.Printf("handler : reçu %s (%d ko)", header.Filename, len(content)/1024)
 
-	var rawText string
-	var extractErr error
-	if IsPDF(destinationPath) {
-		rawText, extractErr = ExtractPDF(destinationPath, model, llmURL)
-	} else {
-		rawText, extractErr = ExtractText(destinationPath, model, llmURL)
-	}
-	if extractErr != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Erreur OCR: "+extractErr.Error())
-		return
-	}
+		job := Job{
+			Filename: header.Filename,
+			Content:  content,
+			Input: Input{
+				Name:        r.FormValue("name"),
+				Surname:     r.FormValue("surname"),
+				PostalCodes: []string{r.FormValue("postal_code")},
+				ValidMonths: 3,
+				Model:       model,
+				LLMURL:      llmURL,
+			},
+			Model:  model,
+			LLMURL: llmURL,
+		}
 
-	input := Input{
-		Name:        r.FormValue("name"),
-		Surname:     r.FormValue("surname"),
-		PostalCodes: []string{r.FormValue("postal_code")},
-		ValidMonths: 3,
-		Model:       model,
-		LLMURL:      llmURL,
-	}
-	result := AnalyzeText(rawText, input)
-	result.RawText = "" // RGPD
+		result, err := queue.Submit(r.Context(), job)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline : "+err.Error())
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+	}
 }
 
 // --- Routes legacy (dev) --------------------------------------------------
