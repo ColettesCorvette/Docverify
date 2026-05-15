@@ -2,7 +2,7 @@
 
 `docverify` est un service Go d'analyse automatisée de justificatifs administratifs (factures, CNI, passeports, justificatifs de domicile) via OCR + LLM multimodal, déployé sur Kubernetes et destiné à être intégré au back-office Regia.
 
-Documentation disponible sur le [wiki Gitea](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
+Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
 
 **Machines :** 
 
@@ -55,7 +55,7 @@ docker build -f deploy/Dockerfile -t docverify-docverify:latest .
 k3d cluster create mini-cluster -p "8680:8680@loadbalancer" -p "8001:8001@loadbalancer"
 k3d image import docverify-docverify:latest -c mini-cluster
 ```
-Les port mappings exposent directement `localhost:8680` (app) et `localhost:8001` (dashboard) sans nécessiter `kubectl port-forward` ni `kubectl proxy`.
+Les port mappings exposent directement `localhost:8680` le programme et `localhost:8001` [dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) sans nécessiter `kubectl port-forward` ni `kubectl proxy`.
 
 ### Vérifier
 
