@@ -25,10 +25,12 @@ func DefaultLLMURL() string {
 // V1 sans AuthMiddleware ni RBAC : docverify est un service interne
 // appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
 func StartServer() {
+	queue := NewQueue(DefaultWorkers())
+
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /health", handleHealth)
-	mux.HandleFunc("POST /api/v1/supporting-documents", handlePostSupportingDocument)
+	mux.HandleFunc("POST /api/v1/supporting-documents", makeSupportingDocumentHandler(queue))
 
 	// --- Routes legacy (dev / testclient / bench) -------------------------
 	// Décommenter pour réactiver les anciens points d'entrée multipart.
@@ -71,68 +73,68 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 //   - postal_code  : code postal attendu (idem)
 //   - model        : override du modèle LLM (optionnel)
 //   - llm_url      : override de l'endpoint LLM (optionnel)
-func handlePostSupportingDocument(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(10 << 20); err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
-		return
-	}
+// makeSupportingDocumentHandler renvoie un handler qui dépose chaque requête
+// dans la queue in-process et attend le verdict d'un worker.
+func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseMultipartForm(10 << 20); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
+			return
+		}
 
-	file, header, err := r.FormFile("doc")
-	if err != nil {
-		writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")
-		return
-	}
-	defer file.Close()
+		file, header, err := r.FormFile("doc")
+		if err != nil {
+			writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")
+			return
+		}
+		defer file.Close()
 
-	destinationPath := filepath.Join("/tmp", header.Filename)
-	dst, err := os.Create(destinationPath)
-	if err != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
-		return
-	}
-	if _, err := io.Copy(dst, file); err != nil {
+		destinationPath := filepath.Join("/tmp", header.Filename)
+		dst, err := os.Create(destinationPath)
+		if err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
+			return
+		}
+		if _, err := io.Copy(dst, file); err != nil {
+			dst.Close()
+			os.Remove(destinationPath)
+			writeJSONError(w, http.StatusInternalServerError, "Erreur sauvegarde fichier")
+			return
+		}
 		dst.Close()
-		os.Remove(destinationPath)
-		writeJSONError(w, http.StatusInternalServerError, "Erreur sauvegarde fichier")
-		return
-	}
-	dst.Close()
-	defer os.Remove(destinationPath)
 
-	model := r.FormValue("model")
-	if model == "" {
-		model = DefaultModel
-	}
-	llmURL := r.FormValue("llm_url")
-	if llmURL == "" {
-		llmURL = DefaultLLMURL()
-	}
+		model := r.FormValue("model")
+		if model == "" {
+			model = DefaultModel
+		}
+		llmURL := r.FormValue("llm_url")
+		if llmURL == "" {
+			llmURL = DefaultLLMURL()
+		}
 
-	var rawText string
-	var extractErr error
-	if IsPDF(destinationPath) {
-		rawText, extractErr = ExtractPDF(destinationPath, model, llmURL)
-	} else {
-		rawText, extractErr = ExtractText(destinationPath, model, llmURL)
-	}
-	if extractErr != nil {
-		writeJSONError(w, http.StatusInternalServerError, "Erreur OCR: "+extractErr.Error())
-		return
-	}
+		job := Job{
+			FilePath: destinationPath,
+			Input: Input{
+				Name:        r.FormValue("name"),
+				Surname:     r.FormValue("surname"),
+				PostalCodes: []string{r.FormValue("postal_code")},
+				ValidMonths: 3,
+				Model:       model,
+				LLMURL:      llmURL,
+			},
+			Model:  model,
+			LLMURL: llmURL,
+		}
 
-	input := Input{
-		Name:        r.FormValue("name"),
-		Surname:     r.FormValue("surname"),
-		PostalCodes: []string{r.FormValue("postal_code")},
-		ValidMonths: 3,
-		Model:       model,
-		LLMURL:      llmURL,
-	}
-	result := AnalyzeText(rawText, input)
-	result.RawText = "" // RGPD
+		res := q.Submit(job)
+		if res.Err != nil {
+			writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline: "+res.Err.Error())
+			return
+		}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(res.Analysis)
+	}
 }
 
 // --- Routes legacy (dev) --------------------------------------------------
