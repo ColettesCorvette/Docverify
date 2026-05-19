@@ -202,13 +202,4 @@ Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un sl
 └─────────────────────────────────────────────────────────────────────────┘
 ```
 
-## Pour aller plus loin
 
-| Sujet | Doc |
-|---|---|
-| API HTTP, champs, codes erreur | [docs/api.md](docs/api.md) |
-| Queue Go + fallback segmentation | [docs/queue-pipeline.md](docs/queue-pipeline.md) |
-| Supervision vllm-mlx, étapes 1-3 | [docs/setup/supervision.md](docs/setup/supervision.md) |
-| Déploiement k3d détaillé | [docs/deploiement-k8s.md](docs/deploiement-k8s.md) |
-| vllm-mlx, flags et benchs | [docs/vllm-mlx.md](docs/vllm-mlx.md) |
-| Architecture cible V2 | [docs/architectureV2.md](docs/architectureV2.md) |
