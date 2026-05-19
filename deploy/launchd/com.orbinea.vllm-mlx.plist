@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.orbinea.vllm-mlx</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/dev/vllm-mlx-env/bin/vllm-mlx</string>
+        <string>serve</string>
+        <string>mlx-community/Qwen2.5-VL-32B-Instruct-4bit</string>
+        <string>--mllm</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>8000</string>
+        <string>--continuous-batching</string>
+        <string>--max-num-seqs</string>
+        <string>5</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>HOME</key>
+        <string>/Users/dev</string>
+        <key>PATH</key>
+        <string>/Users/dev/vllm-mlx-env/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/dev</string>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/dev/Library/Logs/vllm-mlx/stdout.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/dev/Library/Logs/vllm-mlx/stderr.log</string>
+
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>
