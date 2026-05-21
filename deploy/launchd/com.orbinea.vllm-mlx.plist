@@ -5,9 +5,14 @@
     <key>Label</key>
     <string>com.orbinea.vllm-mlx</string>
 
+    <key>UserName</key>
+    <string>test</string>
+    <key>GroupName</key>
+    <string>staff</string>
+
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/dev/vllm-mlx-env/bin/vllm-mlx</string>
+        <string>/Users/test/vllm-mlx-env/bin/vllm-mlx</string>
         <string>serve</string>
         <string>mlx-community/Qwen2.5-VL-32B-Instruct-4bit</string>
         <string>--mllm</string>
@@ -23,13 +28,13 @@
     <key>EnvironmentVariables</key>
     <dict>
         <key>HOME</key>
-        <string>/Users/dev</string>
+        <string>/Users/test</string>
         <key>PATH</key>
-        <string>/Users/dev/vllm-mlx-env/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
+        <string>/Users/test/vllm-mlx-env/bin:/opt/homebrew/bin:/usr/bin:/bin</string>
     </dict>
 
     <key>WorkingDirectory</key>
-    <string>/Users/dev</string>
+    <string>/Users/test</string>
 
     <key>RunAtLoad</key>
     <true/>
@@ -46,9 +51,9 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/dev/Library/Logs/vllm-mlx/stdout.log</string>
+    <string>/Users/test/Library/Logs/vllm-mlx/stdout.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/dev/Library/Logs/vllm-mlx/stderr.log</string>
+    <string>/Users/test/Library/Logs/vllm-mlx/stderr.log</string>
 
     <key>ProcessType</key>
     <string>Interactive</string>
