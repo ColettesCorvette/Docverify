@@ -268,16 +268,3 @@ Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un sl
 │                Apple ML Framework, Metal kernels                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
-
-## Pour aller plus loin
-
-| Sujet | Doc |
-|---|---|
-| API HTTP, champs, codes erreur | [docs/api.md](docs/api.md) |
-| Queue Go + fallback segmentation | [docs/queue-pipeline.md](docs/queue-pipeline.md) |
-| **Déploiement vllm-mlx via macOS-vz-kubelet** | [docs/setup/macos-vz.md](docs/setup/macos-vz.md) |
-| Préparation de l'image VM | [docs/macos-vm-setup-guide.md](docs/macos-vm-setup-guide.md) |
-| Supervision vllm-mlx (LaunchDaemon, watchdog) | [docs/setup/supervision.md](docs/setup/supervision.md) |
-| Déploiement k3d détaillé | [docs/deploiement-k8s.md](docs/deploiement-k8s.md) |
-| vllm-mlx, flags et benchs | [docs/vllm-mlx.md](docs/vllm-mlx.md) |
-| Architecture cible V2 | [docs/architectureV2.md](docs/architectureV2.md) |
