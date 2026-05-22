@@ -8,7 +8,7 @@
 
 Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
 
-> **Branche `feat/macos-img`** : vllm-mlx ne tourne plus sur le host mais **dans une VM macOS pilotée par Kubernetes** via [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet). L'archi côté code Go est identique à `main` : seuls les artefacts de déploiement diffèrent (`deploy/k8s/macos.yaml`, `deploy/launchd/com.orbinea.vllm-mlx.plist`, `LLM_URL` dans `docverify-deployment.yaml`). Voir [docs/setup/macos-vz.md](docs/setup/macos-vz.md) pour la procédure complète.
+> **Branche `feat/macos-img`** : vllm-mlx ne tourne plus sur le host mais **dans une VM macOS pilotée par Kubernetes** via [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet). L'archi côté code Go est identique à `main` : seuls les artefacts de déploiement diffèrent (`deploy/k8s/macos.yaml`, `deploy/launchd/com.orbinea.vllm-mlx.plist`, `LLM_URL` dans `docverify-deployment.yaml`). Voir [Déploiement macOS-vz](https://git.int.orbinea.example/tfuchs/docverify/wiki/Déploiement-macOS-vz) sur le wiki pour la procédure complète.
 
 ## Comment ça marche
 
@@ -53,10 +53,22 @@ git clone https://github.com/agoda-com/oras-macos-vz ~/oras-macos-vz
 
 ## Préparer la VM macOS source
 
-C'est l'étape la plus longue (création d'image, install vllm-mlx, télécharger Qwen). Procédure détaillée : [docs/macos-vm-setup-guide.md](docs/macos-vm-setup-guide.md). À la fin :
+C'est l'étape la plus longue (création d'image, install vllm-mlx, télécharger Qwen). Procédure détaillée sur le wiki : [Préparation image VM](https://git.int.orbinea.example/tfuchs/docverify/wiki/Préparation-image-VM). À la fin :
 
 - `~/disk.img` + `~/aux.img` + `~/vm.json` (avec `hardwareModel` et `machineId` base64)
 - Dans la VM (user `test`) : `vllm-mlx` installé, modèle Qwen pré-téléchargé, plist en `LaunchDaemon` dans `/Library/LaunchDaemons/`, SSH activé.
+
+Deux scripts versionnés automatisent la majorité du setup :
+
+```bash
+# Setup vllm-mlx + LaunchDaemon dans une VM fraîche (boot manuel obligatoire avant)
+scp scripts/setup-vm.sh deploy/launchd/com.orbinea.vllm-mlx.plist test@<vm-ip>:~/
+ssh test@<vm-ip> 'bash ~/setup-vm.sh'
+
+# Ménage caches + zero-fill APFS juste avant capture OCI (gain ~10-20% sur compression)
+ssh test@<vm-ip> 'bash -s' < scripts/cleanup-vm.sh
+ssh test@<vm-ip> 'sudo shutdown -h now'
+```
 
 ## Build des outils macOS-vz
 
@@ -268,3 +280,5 @@ Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un sl
 │                Apple ML Framework, Metal kernels                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+
