@@ -53,10 +53,22 @@ type chatResponse struct {
 	} `json:"error,omitempty"`
 }
 
+// llmHTTPClient est partagé entre tous les appels RunLLM pour réutiliser
+// les connexions TCP vers vllm-mlx (keepalive). Le timeout par requête est
+// piloté par le contexte transmis, pas par le client.
+var llmHTTPClient = &http.Client{
+	Transport: &http.Transport{
+		MaxIdleConns:        10,
+		MaxIdleConnsPerHost: 5,
+		IdleConnTimeout:     90 * time.Second,
+	},
+}
+
 // RunLLM appelle l'endpoint OpenAI-compatible (vllm-mlx, vLLM, etc.)
-// pour transcrire l'image fournie.
-func RunLLM(imagePath, model, llmURL string) (string, error) {
-	if err := pingLLM(llmURL); err != nil {
+// pour transcrire l'image fournie. Le contexte propage l'annulation côté
+// client HTTP et le timeout global du job.
+func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error) {
+	if err := pingLLM(ctx, llmURL); err != nil {
 		return "", fmt.Errorf("Endpoint LLM non joignable (%s): %w\n"+
 			"  → Vérifiez : curl %s/v1/models", llmURL, err, llmURL)
 	}
@@ -94,26 +106,23 @@ func RunLLM(imagePath, model, llmURL string) (string, error) {
 		return "", err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	reqCtx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 
 	apiURL := strings.TrimRight(llmURL, "/") + "/v1/chat/completions"
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, bytes.NewReader(body))
 	if err != nil {
 		return "", err
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	done := make(chan struct{})
-	go spinner(done)
-
-	resp, err := (&http.Client{}).Do(req)
-	close(done)
-	fmt.Print("\r")
-
+	resp, err := llmHTTPClient.Do(req)
 	if err != nil {
-		if ctx.Err() == context.DeadlineExceeded {
+		if reqCtx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("timeout dépassé (3 min)")
+		}
+		if ctx.Err() != nil {
+			return "", fmt.Errorf("requête annulée: %w", ctx.Err())
 		}
 		return "", fmt.Errorf("HTTP POST: %w", err)
 	}
@@ -142,37 +151,22 @@ func RunLLM(imagePath, model, llmURL string) (string, error) {
 		return "", fmt.Errorf("contenu vide — modèle '%s' mal chargé ?", model)
 	}
 
-	fmt.Printf("   ✅ OCR terminé (%d caractères)                    \n", len(text))
+	fmt.Printf("   OCR terminé (%d caractères)\n", len(text))
 	return text, nil
 }
 
-// spinner affiche une animation tant que done n'est pas fermé.
-func spinner(done <-chan struct{}) {
-	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"}
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
-	i := 0
-	for {
-		select {
-		case <-done:
-			return
-		case <-ticker.C:
-			fmt.Printf("\r   %s Analyse OCR en cours...", frames[i%len(frames)])
-			i++
-		}
-	}
-}
-
-// pingLLM vérifie que l'endpoint LLM répond sur /v1/models.
-func pingLLM(llmURL string) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+// pingLLM vérifie que l'endpoint LLM répond sur /v1/models. Hérite du
+// contexte parent pour pouvoir être interrompu si le client HTTP raccroche
+// avant même que le LLM ne soit sollicité.
+func pingLLM(ctx context.Context, llmURL string) error {
+	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	url := strings.TrimRight(llmURL, "/") + "/v1/models"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	req, err := http.NewRequestWithContext(pingCtx, http.MethodGet, url, nil)
 	if err != nil {
 		return err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := llmHTTPClient.Do(req)
 	if err != nil {
 		return err
 	}

@@ -33,14 +33,14 @@ func preprocessImage(imagePath string) (string, func(), error) {
 
 	cmd := exec.Command("convert",
 		imagePath,
-		"-colorspace", "Gray",       // niveaux de gris
+		"-colorspace", "Gray", // niveaux de gris
 		"-normalize",                 // étire l'histogramme
 		"-contrast-stretch", "3%x3%", // coupe les extrêmes pour booster le contraste
 		outPath,
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("   ⚠️  Prétraitement image échoué: %s\n", strings.TrimSpace(string(out)))
+		fmt.Printf("   Prétraitement image échoué: %s\n", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}, nil
 	}
@@ -85,7 +85,7 @@ func preprocessForLLM(imagePath string) (string, func(), error) {
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("   ⚠️  Prétraitement LLM échoué: %s\n", strings.TrimSpace(string(out)))
+		fmt.Printf("   Prétraitement LLM échoué: %s\n", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}, nil
 	}

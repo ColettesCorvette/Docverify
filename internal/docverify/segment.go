@@ -2,6 +2,7 @@ package docverify
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // scoreAnalysis attribue 1 point par information utile extraite. Sert à
@@ -263,8 +265,8 @@ func cropRegion(imagePath string, r Region, outPath string, padding int) error {
 // n'apporterait rien et le pipeline standard a déjà été tenté.
 //
 // Les crops temporaires sont stockés dans un dossier tempdir nettoyé en fin
-// d'exécution.
-func ExtractWithSegmentation(path, model, llmURL string) (string, error) {
+// d'exécution. Le contexte est propagé à chaque appel RunLLM concurrent.
+func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (string, error) {
 	imagePath := path
 	if IsPDF(path) {
 		ip, cleanup, err := convertPDFToImage(path)
@@ -292,8 +294,14 @@ func ExtractWithSegmentation(path, model, llmURL string) (string, error) {
 	}
 	defer os.RemoveAll(zonesDir)
 
-	var combined strings.Builder
-	successCount := 0
+	type zoneResult struct {
+		idx  int
+		text string
+		err  error
+	}
+	results := make(chan zoneResult, len(regions))
+
+	var wg sync.WaitGroup
 	for i, r := range regions {
 		cropPath := filepath.Join(zonesDir, fmt.Sprintf("zone-%02d.png", i+1))
 		if err := cropRegion(imagePath, r, cropPath, 20); err != nil {
@@ -303,9 +311,32 @@ func ExtractWithSegmentation(path, model, llmURL string) (string, error) {
 		fmt.Printf("   Zone %d/%d %dx%d à (%d,%d)\n",
 			i+1, len(regions), r.Width, r.Height, r.X, r.Y)
 
-		text, err := RunLLM(cropPath, model, llmURL)
-		if err != nil {
-			fmt.Printf("   OCR zone %d échoué: %v\n", i+1, err)
+		wg.Add(1)
+		go func(idx int, cropPath string) {
+			defer wg.Done()
+			text, err := RunLLM(ctx, cropPath, model, llmURL)
+			results <- zoneResult{idx: idx, text: text, err: err}
+		}(i, cropPath)
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	byIdx := make(map[int]string, len(regions))
+	for r := range results {
+		if r.err != nil {
+			fmt.Printf("   OCR zone %d échoué: %v\n", r.idx+1, r.err)
+			continue
+		}
+		byIdx[r.idx] = r.text
+	}
+
+	var combined strings.Builder
+	successCount := 0
+	for i := range regions {
+		text, ok := byIdx[i]
+		if !ok {
 			continue
 		}
 		combined.WriteString("=== Zone ")

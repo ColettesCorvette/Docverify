@@ -1,11 +1,13 @@
 package docverify
 
 import (
+	"context"
 	"fmt"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 const (
@@ -89,17 +91,20 @@ func hasComplexBackground(imagePath string) bool {
 //  1. Tesseract sur image brute (meilleur PSM parmi 3,4,6,11)
 //  2. Tesseract sur image prétraitée ImageMagick
 //  3. LLM en fallback final
-func ExtractText(imagePath, model, llmURL string) (string, error) {
+//
+// Le contexte est propagé aux appels LLM pour permettre l'annulation côté
+// client (Regia) ou le timeout global du job.
+func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, error) {
 
 	// Étape 0 : détecter si le fond est complexe (guilloché, texturé)
 	if hasComplexBackground(imagePath) {
 		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
-		return RunLLM(imagePath, model, llmURL)
+		return RunLLM(ctx, imagePath, model, llmURL)
 	}
 
 	if !tesseractAvailable() {
 		fmt.Println("   Moteur OCR    : LLM (Tesseract absent — brew install tesseract tesseract-lang)")
-		return RunLLM(imagePath, model, llmURL)
+		return RunLLM(ctx, imagePath, model, llmURL)
 	}
 
 	// Étape 1 : Tesseract brut, meilleur PSM
@@ -109,7 +114,7 @@ func ExtractText(imagePath, model, llmURL string) (string, error) {
 	if q >= ocrQualityThreshold {
 		return text, nil
 	}
-	fmt.Printf("   ⚠️  Qualité insuffisante (%.0f%% < %.0f%%)\n", q*100, ocrQualityThreshold*100)
+	fmt.Printf("   Qualité insuffisante (%.0f%% < %.0f%%)\n", q*100, ocrQualityThreshold*100)
 
 	// Étape 2 : prétraitement + retry
 	if isImageMagickAvailable() {
@@ -121,36 +126,56 @@ func ExtractText(imagePath, model, llmURL string) (string, error) {
 		if q2 >= ocrQualityThreshold {
 			return text2, nil
 		}
-		fmt.Printf("   ⚠️  Qualité insuffisante après prétraitement (%.0f%%)\n", q2*100)
+		fmt.Printf("   Qualité insuffisante après prétraitement (%.0f%%)\n", q2*100)
 	}
 
 	// Étape 3 : fallback LLM
 	fmt.Println("   Bascule sur LLM (document complexe)")
-	return RunLLM(imagePath, model, llmURL)
+	return RunLLM(ctx, imagePath, model, llmURL)
 }
 
-// bestTesseractResult essaie plusieurs modes PSM et retourne le texte
-// ayant le meilleur score de qualité OCR.
+// bestTesseractResult essaie plusieurs modes PSM en parallèle et retourne le
+// texte ayant le meilleur score de qualité OCR. Tesseract est un process
+// externe par PSM ; les quatre invocations indépendantes tournent en
+// concurrence pour diviser la latence par ~4 quand toutes aboutissent.
 func bestTesseractResult(imagePath string) (string, float64) {
 	modes := []string{"6", "3", "4", "11"}
+
+	type psmResult struct {
+		text string
+		q    float64
+	}
+	results := make(chan psmResult, len(modes))
+
+	var wg sync.WaitGroup
+	for _, psm := range modes {
+		wg.Add(1)
+		go func(psm string) {
+			defer wg.Done()
+			out, err := exec.Command("tesseract", imagePath, "stdout",
+				"-l", "fra+eng", "--psm", psm).Output()
+			if err != nil {
+				out, err = exec.Command("tesseract", imagePath, "stdout",
+					"--psm", psm).Output()
+				if err != nil {
+					return
+				}
+			}
+			text := strings.TrimSpace(string(out))
+			results <- psmResult{text: text, q: ocrQuality(text)}
+		}(psm)
+	}
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
 	bestText := ""
 	bestQ := 0.0
-
-	for _, psm := range modes {
-		out, err := exec.Command("tesseract", imagePath, "stdout",
-			"-l", "fra+eng", "--psm", psm).Output()
-		if err != nil {
-			out, err = exec.Command("tesseract", imagePath, "stdout",
-				"--psm", psm).Output()
-			if err != nil {
-				continue
-			}
-		}
-		text := strings.TrimSpace(string(out))
-		q := ocrQuality(text)
-		if q > bestQ {
-			bestQ = q
-			bestText = text
+	for r := range results {
+		if r.q > bestQ {
+			bestQ = r.q
+			bestText = r.text
 		}
 	}
 	return bestText, bestQ

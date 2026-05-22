@@ -63,6 +63,9 @@ var docTypeKeywords = map[DocType][]string{
 }
 
 // DetectDocType analyse le texte OCR et retourne le type de document le plus probable.
+//
+// L'itération sur scores se fait dans un ordre stable pour rendre le verdict
+// déterministe en cas d'égalité de scores entre deux types.
 func DetectDocType(text string) DocType {
 	lower := strings.ToLower(text)
 	scores := map[DocType]int{}
@@ -75,13 +78,23 @@ func DetectDocType(text string) DocType {
 	}
 	bestType := DocTypeUnknown
 	bestScore := 0
-	for dt, score := range scores {
-		if score > bestScore {
-			bestScore = score
+	for _, dt := range docTypeOrder {
+		if scores[dt] > bestScore {
+			bestScore = scores[dt]
 			bestType = dt
 		}
 	}
 	return bestType
+}
+
+// docTypeOrder fige un ordre stable pour itérer sur les types de documents
+// quand plusieurs ont le même score. L'ordre traduit une priorité métier :
+// passeport et CNI avant facture et courrier.
+var docTypeOrder = []DocType{
+	DocTypePassport,
+	DocTypeID,
+	DocTypeInvoice,
+	DocTypeLetter,
 }
 
 // --- Parsing de la date ---

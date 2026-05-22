@@ -1,6 +1,7 @@
 package docverify
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,7 +17,10 @@ const minTextChars = 50
 // Détecte automatiquement si le PDF est texte ou scanné :
 //   - PDF texte  → pdftotext (rapide, parfait)
 //   - PDF scanné → pdftoppm + Tesseract/LLM
-func ExtractPDF(pdfPath, model, llmURL string) (string, error) {
+//
+// Le contexte est propagé à ExtractText pour permettre l'annulation côté
+// client (Regia) ou le timeout global du job.
+func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, error) {
 	// 1. Tenter pdftotext en premier
 	if text, ok := tryPDFToText(pdfPath); ok {
 		fmt.Println("   Type PDF      : texte natif (pdftotext)")
@@ -32,7 +36,7 @@ func ExtractPDF(pdfPath, model, llmURL string) (string, error) {
 	defer cleanup()
 	fmt.Printf("   Image générée : %s\n", imgPath)
 
-	return ExtractText(imgPath, model, llmURL)
+	return ExtractText(ctx, imgPath, model, llmURL)
 }
 
 // tryPDFToText tente d'extraire le texte via pdftotext.

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // DefaultLLMURL retourne l'URL de l'endpoint LLM OpenAI-compatible par défaut.
@@ -37,8 +38,17 @@ func StartServer() {
 	// mux.HandleFunc("POST /check", handleCheck)
 	// mux.HandleFunc("POST /batch", handleBatch)
 
+	srv := &http.Server{
+		Addr:              ":8680",
+		Handler:           mux,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       60 * time.Second,
+		WriteTimeout:      5 * time.Minute,
+		IdleTimeout:       120 * time.Second,
+	}
+
 	log.Printf("Serveur docverify sur :8680 (LLM=%s)", DefaultLLMURL())
-	log.Fatal(http.ListenAndServe(":8680", mux))
+	log.Fatal(srv.ListenAndServe())
 }
 
 // --- Health check ---------------------------------------------------------
@@ -73,6 +83,7 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 //   - postal_code  : code postal attendu (idem)
 //   - model        : override du modèle LLM (optionnel)
 //   - llm_url      : override de l'endpoint LLM (optionnel)
+//
 // makeSupportingDocumentHandler renvoie un handler qui dépose chaque requête
 // dans la queue in-process et attend le verdict d'un worker.
 func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
@@ -126,7 +137,7 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 			LLMURL: llmURL,
 		}
 
-		res := q.Submit(job)
+		res := q.Submit(r.Context(), job)
 		if res.Err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline: "+res.Err.Error())
 			return
