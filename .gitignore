@@ -26,9 +26,8 @@ go.work.sum
 .env
 
 
-# Binaire compilé 
+# Binaire compilé
 /docverify
-/testclient
 
 # macOS
 **/.DS_Store

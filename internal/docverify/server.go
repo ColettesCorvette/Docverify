@@ -32,7 +32,7 @@ func StartServer() {
 	mux.HandleFunc("GET /health", handleHealth)
 	mux.HandleFunc("POST /api/v1/supporting-documents", makeSupportingDocumentHandler(queue))
 
-	// --- Routes legacy (dev / testclient / bench) -------------------------
+	// --- Routes legacy (dev / bench) ---------------------------------------
 	// Décommenter pour réactiver les anciens points d'entrée multipart.
 	// mux.HandleFunc("POST /check", handleCheck)
 	// mux.HandleFunc("POST /batch", handleBatch)
@@ -139,8 +139,8 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 
 // --- Routes legacy (dev) --------------------------------------------------
 //
-// handleCheck et handleBatch sont conservés pour le dev local (testclient,
-// bench-batch). Désenregistrés du mux par défaut — voir StartServer.
+// handleCheck et handleBatch sont conservés pour le dev local (bench-batch).
+// Désenregistrés du mux par défaut — voir StartServer.
 //
 /*
 func handleCheck(w http.ResponseWriter, r *http.Request) {

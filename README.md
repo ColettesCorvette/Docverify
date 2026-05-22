@@ -8,8 +8,6 @@
 
 Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
 
-> **Branche `feat/macos-img`** : vllm-mlx ne tourne plus sur le host mais **dans une VM macOS pilotée par Kubernetes** via [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet). L'archi côté code Go est identique à `main` : seuls les artefacts de déploiement diffèrent (`deploy/k8s/macos.yaml`, `deploy/launchd/com.orbinea.vllm-mlx.plist`, `LLM_URL` dans `docverify-deployment.yaml`). Voir [Déploiement macOS-vz](https://git.int.orbinea.example/tfuchs/docverify/wiki/Déploiement-macOS-vz) sur le wiki pour la procédure complète.
-
 ## Comment ça marche
 
 Regia envoie le document en POST sur l'API. Le handler dépose le job dans une queue in-process Go : un channel bufferisé alimenté par les requêtes HTTP et consommé par un pool de workers. Chaque worker exécute le pipeline OCR + analyse : extraction par `pdftotext` ou Tesseract sur les documents simples, fallback vers un LLM multimodal (Qwen2.5-VL-32B servi par vllm-mlx) pour les images et fonds complexes.
@@ -142,7 +140,7 @@ kubectl config view --raw --minify -o json | jq -r '.clusters[0].cluster["certif
 chmod 600 ~/.kube/k3d-tls/tls.key
 ```
 
-Lancement en foreground (pour debug ; à convertir en LaunchAgent host à terme) :
+Lancement en foreground pour le debug. Pour pérenniser, déposer le plist `deploy/launchd/com.orbinea.macos-vz-kubelet.plist` dans `~/Library/LaunchAgents/` après avoir renseigné le `VZ_SSH_PASSWORD` ; le LaunchAgent prend alors le relais au login :
 
 ```bash
 export APISERVER_CERT_LOCATION=$HOME/.kube/k3d-tls/tls.crt
@@ -171,7 +169,7 @@ kubectl get pods -w
 
 Deux manifests :
 
-- `docverify-deployment.yaml` : Deployment 2 replicas + Service LoadBalancer :8680. `LLM_URL = http://vllm-mlx:8000` (DNS interne du Service K8s, plus de `host.docker.internal`).
+- `docverify-deployment.yaml` : Deployment 2 replicas + Service LoadBalancer :8680. `LLM_URL = http://vllm-mlx:8000` (DNS interne du Service K8s).
 - `macos.yaml` : Pod unique sur le node `macos-vz-mini` (toleration `virtual-kubelet.io/provider=macos-vz`, nodeSelector `kubernetes.io/os=darwin`) + Service ClusterIP `vllm-mlx:8000`.
 
 Le pod `macos` enchaîne `Pending → Downloading → ContainerCreating → Running` en 5-15 min selon le pull de l'image OCI.
