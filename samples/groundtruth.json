@@ -137,16 +137,18 @@
     "solange": {
       "file": "carte_identite_Solange.png",
       "input": {
-        "name": "SOLANGE"
+        "name": "DURAND",
+        "surname": "SOLANGE"
       },
       "expected": {
         "doc_type": "carte_identite",
         "name_found": true,
+        "surname_found": true,
         "date_found": true,
         "ok": true,
         "unreadable": false
       },
-      "notes": "CNI Solange, sample ajouté le 2026-05-26 (2.6 Mo). Vérifier doc_type et MRZ."
+      "notes": "CNI française biométrique N&B recto+verso sur la même page (2480x3508, 2.6 Mo). Identité : DURAND SOLANGE GERMAINE, nom d'usage BEUR, née le 03/07/1962. La passe Tesseract initiale extrait du contenu utile mais bruité (date OCRisée 91.09:1959, MRZ TD1 à 35 chars au lieu de 30). Inputs corrigés le 2026-05-27 pour refléter le doc : SOLANGE est prénom, pas nom."
     },
     "impot": {
       "file": "impot_exemple.pdf",

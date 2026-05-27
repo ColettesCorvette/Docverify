@@ -18,20 +18,24 @@ const minTextChars = 50
 //   - PDF texte  → pdftotext (rapide, parfait)
 //   - PDF scanné → pdftoppm + Tesseract/LLM
 //
+// Retourne le texte, un flag usedLLM identique à ExtractText quand on
+// bascule sur l'image, et false pour les PDF texte natifs traités par
+// pdftotext.
+//
 // Le contexte est propagé à ExtractText pour permettre l'annulation côté
 // client (Regia) ou le timeout global du job.
-func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, error) {
+func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, bool, error) {
 	// 1. Tenter pdftotext en premier
 	if text, ok := tryPDFToText(pdfPath); ok {
 		fmt.Println("   Type PDF      : texte natif (pdftotext)")
-		return text, nil
+		return text, false, nil
 	}
 
 	// 2. PDF scanné : convertir en image puis OCR
 	fmt.Println("   Type PDF      : scanné → conversion image + OCR")
 	imgPath, cleanup, err := convertPDFToImage(pdfPath)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	defer cleanup()
 	fmt.Printf("   Image générée : %s\n", imgPath)

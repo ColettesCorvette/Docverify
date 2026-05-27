@@ -107,26 +107,60 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 	defer os.Remove(job.FilePath)
 
 	var rawText string
+	var usedLLM bool
 	var err error
 	if IsPDF(job.FilePath) {
-		rawText, err = ExtractPDF(ctx, job.FilePath, job.Model, job.LLMURL)
+		rawText, usedLLM, err = ExtractPDF(ctx, job.FilePath, job.Model, job.LLMURL)
 	} else {
-		rawText, err = ExtractText(ctx, job.FilePath, job.Model, job.LLMURL)
+		rawText, usedLLM, err = ExtractText(ctx, job.FilePath, job.Model, job.LLMURL)
 	}
 	if err != nil {
 		return JobResult{Err: err}
 	}
 
 	analysis := AnalyzeText(rawText, job.Input)
+	debug := os.Getenv("DOCVERIFY_DEBUG_OCR") == "1"
+	if debug {
+		debugLogRawText("initial", analysis)
+	}
+
+	// Fallback LLM full-page : si la passe initiale est Tesseract (ou
+	// pdftotext) et que le score sémantique reste faible, on tente le LLM
+	// sur l'image entière avant de segmenter. Sur des scans HD où Tesseract
+	// rend un texte bruité (cas solange, CNI N&B 2480x3508), le LLM avec
+	// le contexte global peut extraire des champs que Tesseract rate.
+	if !usedLLM && scoreAnalysis(analysis) < segmentationTriggerScore && !IsPDF(job.FilePath) {
+		log.Printf("   Score initial=%d (Tesseract) — fallback LLM image entière",
+			scoreAnalysis(analysis))
+		llmText, llmErr := RunLLM(ctx, job.FilePath, job.Model, job.LLMURL)
+		if llmErr != nil {
+			log.Printf("   LLM full-page échoué: %v", llmErr)
+		} else if llmText != "" {
+			llmAnalysis := AnalyzeText(llmText, job.Input)
+			if debug {
+				debugLogRawText("llm-full", llmAnalysis)
+			}
+			if scoreAnalysis(llmAnalysis) > scoreAnalysis(analysis) {
+				log.Printf("   LLM full-page retenu: score %d -> %d",
+					scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
+				analysis = llmAnalysis
+			} else {
+				log.Printf("   LLM full-page n'améliore pas, conservation initiale")
+			}
+		}
+	}
 
 	if analysis.Unreadable || scoreAnalysis(analysis) < segmentationTriggerScore {
-		log.Printf("   Score initial=%d, unreadable=%v — tentative de segmentation",
+		log.Printf("   Score=%d, unreadable=%v — tentative de segmentation",
 			scoreAnalysis(analysis), analysis.Unreadable)
 		segText, segErr := ExtractWithSegmentation(ctx, job.FilePath, job.Model, job.LLMURL)
 		if segErr != nil {
 			log.Printf("   Segmentation échouée: %v", segErr)
 		} else if segText != "" {
 			segAnalysis := AnalyzeText(segText, job.Input)
+			if debug {
+				debugLogRawText("segment", segAnalysis)
+			}
 			if scoreAnalysis(segAnalysis) > scoreAnalysis(analysis) {
 				log.Printf("   Segmentation retenue: score %d -> %d",
 					scoreAnalysis(analysis), scoreAnalysis(segAnalysis))
@@ -137,9 +171,6 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 		}
 	}
 
-	if os.Getenv("DOCVERIFY_DEBUG_OCR") == "1" {
-		debugLogRawText(analysis)
-	}
 	analysis.RawText = ""
 	return JobResult{Analysis: analysis}
 }
@@ -147,16 +178,17 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 // debugLogRawText émet les 1500 premiers caractères du texte OCR dans les
 // logs serveur. Activé seulement quand DOCVERIFY_DEBUG_OCR=1 ; à utiliser
 // ponctuellement pour diagnostiquer un sample qui ressort doc_type=inconnu
-// alors qu'on attend un verdict positif. Désactivé en production pour ne
-// pas exposer de PII dans les logs K8s.
-func debugLogRawText(a AnalysisResult) {
+// alors qu'on attend un verdict positif. Le tag distingue la passe initiale
+// de la passe segmentation. Désactivé en production pour ne pas exposer
+// de PII dans les logs K8s.
+func debugLogRawText(phase string, a AnalysisResult) {
 	preview := a.RawText
 	const maxLen = 1500
 	if len(preview) > maxLen {
 		preview = preview[:maxLen] + "...[tronqué]"
 	}
-	log.Printf("[DEBUG OCR] doc_type=%s name_found=%v date_found=%v score=%d raw_text=%q",
-		a.DocType, a.NameFound, a.DateFound, scoreAnalysis(a), preview)
+	log.Printf("[DEBUG OCR %s] doc_type=%s name_found=%v date_found=%v score=%d raw_text=%q",
+		phase, a.DocType, a.NameFound, a.DateFound, scoreAnalysis(a), preview)
 }
 
 // DefaultWorkers lit QUEUE_WORKERS ou retombe sur 5.

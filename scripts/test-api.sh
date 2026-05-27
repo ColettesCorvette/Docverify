@@ -111,10 +111,11 @@ test_check_justif_pdf() {
 }
 
 test_check_cni_solange() {
-    separator "POST $ROUTE — CNI Solange"
+    separator "POST $ROUTE — CNI Solange (DURAND SOLANGE)"
     curl -s -X POST "$API$ROUTE" \
         -F "doc=@$SAMPLES/carte_identite_Solange.png" \
-        -F "name=SOLANGE" \
+        -F "name=DURAND" \
+        -F "surname=SOLANGE" \
         -F "model=$MODEL" | jq
 }
 

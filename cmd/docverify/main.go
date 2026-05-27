@@ -122,10 +122,10 @@ func runBatch(data []byte) {
 		var extractErr error
 		if dc.IsPDF(doc.Path) {
 			fmt.Println("│  📄 Traitement PDF...")
-			rawText, extractErr = dc.ExtractPDF(context.Background(), doc.Path, batch.Model, batch.LLMURL)
+			rawText, _, extractErr = dc.ExtractPDF(context.Background(), doc.Path, batch.Model, batch.LLMURL)
 		} else {
 			fmt.Println("│  🖼️  Traitement image...")
-			rawText, extractErr = dc.ExtractText(context.Background(), doc.Path, batch.Model, batch.LLMURL)
+			rawText, _, extractErr = dc.ExtractText(context.Background(), doc.Path, batch.Model, batch.LLMURL)
 		}
 
 		if extractErr != nil {
@@ -217,10 +217,10 @@ func runLegacy(data []byte) {
 	var extractErr error
 	if dc.IsPDF(input.DocumentPath) {
 		fmt.Println("📄 Traitement PDF...")
-		rawText, extractErr = dc.ExtractPDF(context.Background(), input.DocumentPath, input.Model, input.LLMURL)
+		rawText, _, extractErr = dc.ExtractPDF(context.Background(), input.DocumentPath, input.Model, input.LLMURL)
 	} else {
 		fmt.Println("🖼️  Traitement image...")
-		rawText, extractErr = dc.ExtractText(context.Background(), input.DocumentPath, input.Model, input.LLMURL)
+		rawText, _, extractErr = dc.ExtractText(context.Background(), input.DocumentPath, input.Model, input.LLMURL)
 	}
 	if extractErr != nil {
 		fmt.Fprintf(os.Stderr, "Erreur extraction: %v\n", extractErr)

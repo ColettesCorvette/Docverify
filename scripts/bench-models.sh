@@ -34,7 +34,7 @@ SPECS=(
     "cni8498|index_8498_1_1200.png|name=DELAUNAY&surname=CAMILLE"
     "justif-jpg|justifs.jpg|name=LEROY&surname=PIERRE&postal_code=17999"
     "justif-pdf|justif2.pdf|name=ORBINEA&postal_code=99000"
-    "solange|carte_identite_Solange.png|name=SOLANGE"
+    "solange|carte_identite_Solange.png|name=DURAND&surname=SOLANGE"
     "impot|impot_exemple.pdf|"
 )
 

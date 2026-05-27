@@ -92,19 +92,25 @@ func hasComplexBackground(imagePath string) bool {
 //  2. Tesseract sur image prétraitée ImageMagick
 //  3. LLM en fallback final
 //
+// Retourne le texte OCR, un booléen usedLLM indiquant si le LLM a été
+// utilisé (utile pour décider d'un fallback en aval si le score reste
+// faible), et une erreur.
+//
 // Le contexte est propagé aux appels LLM pour permettre l'annulation côté
 // client (Regia) ou le timeout global du job.
-func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, error) {
+func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, bool, error) {
 
 	// Étape 0 : détecter si le fond est complexe (guilloché, texturé)
 	if hasComplexBackground(imagePath) {
 		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
-		return RunLLM(ctx, imagePath, model, llmURL)
+		text, err := RunLLM(ctx, imagePath, model, llmURL)
+		return text, true, err
 	}
 
 	if !tesseractAvailable() {
 		fmt.Println("   Moteur OCR    : LLM (Tesseract absent — brew install tesseract tesseract-lang)")
-		return RunLLM(ctx, imagePath, model, llmURL)
+		text, err := RunLLM(ctx, imagePath, model, llmURL)
+		return text, true, err
 	}
 
 	// Étape 1 : Tesseract brut, meilleur PSM
@@ -112,7 +118,7 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 	text, q := bestTesseractResult(imagePath)
 	fmt.Printf("   Qualité OCR   : %.0f%%\n", q*100)
 	if q >= ocrQualityThreshold {
-		return text, nil
+		return text, false, nil
 	}
 	fmt.Printf("   Qualité insuffisante (%.0f%% < %.0f%%)\n", q*100, ocrQualityThreshold*100)
 
@@ -124,14 +130,15 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 		text2, q2 := bestTesseractResult(pp)
 		fmt.Printf("   Qualité OCR   : %.0f%%\n", q2*100)
 		if q2 >= ocrQualityThreshold {
-			return text2, nil
+			return text2, false, nil
 		}
 		fmt.Printf("   Qualité insuffisante après prétraitement (%.0f%%)\n", q2*100)
 	}
 
 	// Étape 3 : fallback LLM
 	fmt.Println("   Bascule sur LLM (document complexe)")
-	return RunLLM(ctx, imagePath, model, llmURL)
+	text, err := RunLLM(ctx, imagePath, model, llmURL)
+	return text, true, err
 }
 
 // bestTesseractResult essaie plusieurs modes PSM en parallèle et retourne le
