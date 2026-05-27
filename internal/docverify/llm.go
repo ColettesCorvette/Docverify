@@ -77,9 +77,6 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 
 	processedPath, cleanup, _ := preprocessForLLM(imagePath)
 	defer cleanup()
-	if processedPath != imagePath {
-		fmt.Println("   Prétraitement : ImageMagick → upscale 200% + unsharp + despeckle")
-	}
 
 	imgB64, err := encodeImageBase64(processedPath)
 	if err != nil {
@@ -98,7 +95,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
-		MaxTokens:   2000,
+		MaxTokens:   1000,
 		Temperature: 0,
 		Stream:      false,
 	}

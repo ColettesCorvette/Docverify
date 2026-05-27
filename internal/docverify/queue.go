@@ -137,8 +137,26 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 		}
 	}
 
+	if os.Getenv("DOCVERIFY_DEBUG_OCR") == "1" {
+		debugLogRawText(analysis)
+	}
 	analysis.RawText = ""
 	return JobResult{Analysis: analysis}
+}
+
+// debugLogRawText émet les 1500 premiers caractères du texte OCR dans les
+// logs serveur. Activé seulement quand DOCVERIFY_DEBUG_OCR=1 ; à utiliser
+// ponctuellement pour diagnostiquer un sample qui ressort doc_type=inconnu
+// alors qu'on attend un verdict positif. Désactivé en production pour ne
+// pas exposer de PII dans les logs K8s.
+func debugLogRawText(a AnalysisResult) {
+	preview := a.RawText
+	const maxLen = 1500
+	if len(preview) > maxLen {
+		preview = preview[:maxLen] + "...[tronqué]"
+	}
+	log.Printf("[DEBUG OCR] doc_type=%s name_found=%v date_found=%v score=%d raw_text=%q",
+		a.DocType, a.NameFound, a.DateFound, scoreAnalysis(a), preview)
 }
 
 // DefaultWorkers lit QUEUE_WORKERS ou retombe sur 5.

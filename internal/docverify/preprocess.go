@@ -53,32 +53,49 @@ func isImageMagickAvailable() bool {
 	return err == nil
 }
 
-// llmPreprocessSizeLimit borne la taille au-delà de laquelle on ne préprocesse
-// plus avant envoi au LLM. L'upscale 200% sur une image déjà grosse explose
-// le base64 envoyé à vllm-mlx (cas cni8493 : 1.6 Mo source → ~6 Mo base64 →
-// GPU hang Metal). Au-dessus, on envoie l'image telle quelle.
-const llmPreprocessSizeLimit = 1 << 20
+// Seuils de taille du fichier source pour décider du pipeline de
+// prétraitement avant envoi au LLM. Calibré sur les observations cluster
+// du 2026-05-27 :
+//   - Qwen-7B accepte sans broncher jusqu'à ~3 Mo de base64.
+//   - L'upscale 200% sur une image > 1 Mo gonfle au-delà → GPU hang Metal
+//     (cas cni8493 sous Qwen-32B).
+//   - solange (2.6 Mo, 2480x3508, 8.7 MP) sans préprocess donne un OCR
+//     dégradé : Qwen-7B trouve le nom mais rate doc_type et date.
+const (
+	llmPreprocessLightLimit = 1 << 20       // 1 Mo : bascule en mode léger
+	llmPreprocessSkipLimit  = 3 * (1 << 20) // 3 Mo : skip total
+)
 
 // preprocessForLLM améliore une image avant l'envoi au LLM vision.
-// Pipeline orienté lisibilité visuelle, pas binarisation :
-//   - resize 200% : upscale pour rendre les petits caractères MRZ/dates lisibles
-//   - unsharp 0x1 : sharpening léger
-//   - despeckle : retire les artefacts JPEG sans dégrader le texte
 //
-// Court-circuit : si le fichier source dépasse llmPreprocessSizeLimit, on
-// renvoie l'image originale sans la grossir. Évite d'envoyer plusieurs Mo
-// de base64 au LLM, qui timeoute ou crashe en GPU hang sur ce volume.
+// Trois régimes selon la taille du fichier source :
 //
-// Retourne aussi l'image originale si ImageMagick est absent ou si la
-// conversion échoue.
+//	< 1 Mo  : upscale 200% + unsharp + despeckle. Petite image, on grossit
+//	          pour rendre lisible les caractères fins MRZ et dates.
+//	1-3 Mo  : downscale à 2000 px max + unsharp + despeckle. Image déjà
+//	          grande, on évite d'exploser le base64 envoyé à vllm-mlx tout
+//	          en gardant un sharpen utile à l'OCR sur scan bruité.
+//	> 3 Mo  : skip total, image originale envoyée telle quelle. Au-delà,
+//	          aucune retouche ne sauve l'envoi.
+//
+// Le suffixe `>` sur `-resize` n'agit que si l'image dépasse la dimension,
+// donc une image 1200x800 source en mode léger ne sera pas redimensionnée.
+//
+// Retourne l'image originale si ImageMagick est absent ou si la conversion
+// échoue.
 func preprocessForLLM(imagePath string) (string, func(), error) {
 	if !isImageMagickAvailable() {
 		return imagePath, func() {}, nil
 	}
 
-	if info, err := os.Stat(imagePath); err == nil && info.Size() > llmPreprocessSizeLimit {
+	info, err := os.Stat(imagePath)
+	if err != nil {
+		return imagePath, func() {}, nil
+	}
+
+	if info.Size() > llmPreprocessSkipLimit {
 		fmt.Printf("   Prétraitement LLM sauté: image source %.1f Mo > %d Mo\n",
-			float64(info.Size())/(1<<20), llmPreprocessSizeLimit>>20)
+			float64(info.Size())/(1<<20), llmPreprocessSkipLimit>>20)
 		return imagePath, func() {}, nil
 	}
 
@@ -93,9 +110,18 @@ func preprocessForLLM(imagePath string) (string, func(), error) {
 	}
 	outPath := filepath.Join(tmpDir, "llm"+ext)
 
+	var resizeArg, mode string
+	if info.Size() > llmPreprocessLightLimit {
+		resizeArg, mode = "2000x2000>", "léger"
+	} else {
+		resizeArg, mode = "200%", "upscale"
+	}
+	fmt.Printf("   Prétraitement LLM %s: resize %s + unsharp + despeckle (source %.1f Mo)\n",
+		mode, resizeArg, float64(info.Size())/(1<<20))
+
 	cmd := exec.Command("convert",
 		imagePath,
-		"-resize", "200%",
+		"-resize", resizeArg,
 		"-unsharp", "0x1",
 		"-despeckle",
 		outPath,
