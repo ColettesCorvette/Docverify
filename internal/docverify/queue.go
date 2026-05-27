@@ -11,7 +11,7 @@ import (
 const (
 	defaultWorkers = 5
 	jobBufferSize  = 100
-	jobTimeout     = 3 * time.Minute
+	jobTimeout     = 90 * time.Second
 	enqueueTimeout = 5 * time.Second
 )
 

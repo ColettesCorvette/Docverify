@@ -53,15 +53,32 @@ func isImageMagickAvailable() bool {
 	return err == nil
 }
 
+// llmPreprocessSizeLimit borne la taille au-delà de laquelle on ne préprocesse
+// plus avant envoi au LLM. L'upscale 200% sur une image déjà grosse explose
+// le base64 envoyé à vllm-mlx (cas cni8493 : 1.6 Mo source → ~6 Mo base64 →
+// GPU hang Metal). Au-dessus, on envoie l'image telle quelle.
+const llmPreprocessSizeLimit = 1 << 20
+
 // preprocessForLLM améliore une image avant l'envoi au LLM vision.
 // Pipeline orienté lisibilité visuelle, pas binarisation :
 //   - resize 200% : upscale pour rendre les petits caractères MRZ/dates lisibles
 //   - unsharp 0x1 : sharpening léger
 //   - despeckle : retire les artefacts JPEG sans dégrader le texte
 //
-// Retourne l'image originale si ImageMagick est absent ou si la conversion échoue.
+// Court-circuit : si le fichier source dépasse llmPreprocessSizeLimit, on
+// renvoie l'image originale sans la grossir. Évite d'envoyer plusieurs Mo
+// de base64 au LLM, qui timeoute ou crashe en GPU hang sur ce volume.
+//
+// Retourne aussi l'image originale si ImageMagick est absent ou si la
+// conversion échoue.
 func preprocessForLLM(imagePath string) (string, func(), error) {
 	if !isImageMagickAvailable() {
+		return imagePath, func() {}, nil
+	}
+
+	if info, err := os.Stat(imagePath); err == nil && info.Size() > llmPreprocessSizeLimit {
+		fmt.Printf("   Prétraitement LLM sauté: image source %.1f Mo > %d Mo\n",
+			float64(info.Size())/(1<<20), llmPreprocessSizeLimit>>20)
 		return imagePath, func() {}, nil
 	}
 

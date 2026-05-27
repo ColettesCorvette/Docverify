@@ -1,5 +1,5 @@
 # --- Compilation --- 
-FROM --platform=linux/arm64 golang:1.22-bookworm AS builder
+FROM --platform=linux/arm64 golang:1.26-bookworm AS builder
 WORKDIR /usr/local/app
 COPY go.mod .
 RUN go mod download
