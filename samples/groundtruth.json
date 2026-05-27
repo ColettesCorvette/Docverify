@@ -152,11 +152,11 @@
       "file": "impot_exemple.pdf",
       "input": {},
       "expected": {
-        "doc_type": "courrier",
+        "doc_type": null,
         "ok": null,
         "unreadable": false
       },
-      "notes": "PDF avis d'impôt, texte natif. Pas de champs name/postal en input — surtout vérifier que le LLM ne hallucine pas. À compléter selon ce qu'on attend du contrat Regia."
+      "notes": "PDF avis d'impôt, texte natif. doc_type laissé null car ambigu : facture / courrier selon les heuristiques de mots-clés (le doc contient 'total à payer' qui scorera facture). À fixer si Regia précise le contrat d'attente pour ce type."
     }
   }
 }

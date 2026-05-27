@@ -3,7 +3,7 @@
 # Usage : ./test-api.sh [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot]
 #
 # Variables d'env :
-#   MODEL — override du modèle LLM (défaut : Qwen2.5-VL-32B-Instruct-4bit)
+#   MODEL — override du modèle LLM (défaut : Qwen2.5-VL-7B-Instruct-4bit)
 #   API   — override de l'URL docverify (défaut : http://localhost:8680)
 #
 # Cible la route principale POST /api/v1/supporting-documents.
@@ -15,7 +15,7 @@ set -e
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="/Users/dev/Desktop/LLM/ocr/samples"
-MODEL="${MODEL:-mlx-community/Qwen2.5-VL-32B-Instruct-4bit}"
+MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 
 # Couleurs
 GREEN='\033[0;32m'

@@ -21,7 +21,7 @@ set -u
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="${SAMPLES:-/Users/dev/Desktop/LLM/ocr/samples}"
-MODEL="${MODEL:-mlx-community/Qwen2.5-VL-32B-Instruct-4bit}"
+MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 
 # Vérité de terrain par sample : champs attendus pour mesurer la justesse.
 # Chaque ligne = sample|file|champs multipart à passer.

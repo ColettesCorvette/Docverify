@@ -10,7 +10,7 @@ Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/do
 
 ## Comment ça marche
 
-Regia envoie le document en POST sur l'API. Le handler dépose le job dans une queue in-process Go : un channel bufferisé alimenté par les requêtes HTTP et consommé par un pool de workers. Chaque worker exécute le pipeline OCR + analyse : extraction par `pdftotext` ou Tesseract sur les documents simples, fallback vers un LLM multimodal (Qwen2.5-VL-32B servi par vllm-mlx) pour les images et fonds complexes.
+Regia envoie le document en POST sur l'API. Le handler dépose le job dans une queue in-process Go : un channel bufferisé alimenté par les requêtes HTTP et consommé par un pool de workers. Chaque worker exécute le pipeline OCR + analyse : extraction par `pdftotext` ou Tesseract sur les documents simples, fallback vers un LLM multimodal (Qwen2.5-VL-7B servi par vllm-mlx) pour les images et fonds complexes.
 
 Si la première passe d'analyse renvoie un score d'information faible ou un verdict `unreadable`, le pipeline tente un second passage par segmentation : ImageMagick détecte les zones de contenu rectangulaires distinctes sur la page (typique d'un recto + verso de CNI scannés ensemble sur une A4), crope chaque zone et la fait OCRiser séparément. Le résultat segmenté n'est retenu que s'il extrait strictement plus de champs que la première passe.
 
@@ -24,7 +24,7 @@ vllm-mlx tourne dans une VM macOS dans le cluster. Le host Mac s'enregistre comm
 | `agoda-com/oras-macos-vz` | https://github.com/agoda-com/oras-macos-vz | Fork d'ORAS qui packe les images VM (disk + aux + hardware-model + machine-id) au format OCI compatible |
 | `s-u/macosvm` | https://github.com/s-u/macosvm | Wrapper `Virtualization.framework` pour créer et booter la VM source pendant la préparation de l'image |
 | `waybarrios/vllm-mlx` | https://github.com/waybarrios/vllm-mlx | Serveur compatible OpenAI sur stack MLX (Apple Silicon), installé dans la VM avant capture |
-| `mlx-community/Qwen2.5-VL-32B-Instruct-4bit` | https://huggingface.co/mlx-community/Qwen2.5-VL-32B-Instruct-4bit | Modèle vision-language utilisé par vllm-mlx |
+| `mlx-community/Qwen2.5-VL-7B-Instruct-4bit` | https://huggingface.co/mlx-community/Qwen2.5-VL-7B-Instruct-4bit | Modèle vision-language par défaut servi par vllm-mlx. Variante 32B disponible mais plus lente et moins juste sur nos samples — voir `docs/rapports/benchmarks-20260526.md`. |
 | `virtual-kubelet/virtual-kubelet` | https://github.com/virtual-kubelet/virtual-kubelet | Library Kubernetes sous-jacente à `macOS-vz-kubelet` |
 
 ## Machines
@@ -243,7 +243,7 @@ Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un sl
 │  │ VM macOS clonée à partir de macos-vm:26.5                     │   │
 │  │   user "test"                                                  │   │
 │  │   /Library/LaunchDaemons/com.orbinea.vllm-mlx.plist             │   │
-│  │   vllm-mlx :8000 (Qwen2.5-VL-32B, MLX)                         │   │
+│  │   vllm-mlx :8000 (Qwen2.5-VL-7B, MLX)                          │   │
 │  │   restart auto sur crash, logs /Users/test/Library/Logs/...   │   │
 │  └──────────────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────────────┘

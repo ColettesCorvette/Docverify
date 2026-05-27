@@ -46,10 +46,10 @@ fi
 source "$HOME/vllm-mlx-env/bin/activate"
 uv pip install -e "$HOME/vllm-mlx[vision]"
 
-step "Modèle Qwen2.5-VL-32B-Instruct-4bit (pré-téléchargement)"
+step "Modèle Qwen2.5-VL-7B-Instruct-4bit (pré-téléchargement)"
 python - <<'PY'
 from huggingface_hub import snapshot_download
-snapshot_download("mlx-community/Qwen2.5-VL-32B-Instruct-4bit")
+snapshot_download("mlx-community/Qwen2.5-VL-7B-Instruct-4bit")
 PY
 
 step "LaunchDaemon vllm-mlx"
