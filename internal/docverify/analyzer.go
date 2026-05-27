@@ -28,15 +28,17 @@ type AnalysisResult struct {
 	PostalFound  bool    `json:"postal_found"`
 	PostalMatch  string  `json:"postal_match,omitempty"`
 	// Pour les passeports/CNI : dates spécifiques
-	DateFound  bool     `json:"date_found"`
-	DateValid  bool     `json:"date_valid"`
-	DocDate    string   `json:"doc_date,omitempty"`
-	ExpiryDate string   `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
-	IssueDate  string   `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
-	BirthDate  string   `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
-	Unreadable bool     `json:"unreadable,omitempty"`  // document illisible, review humaine requise
-	Errors     []string `json:"errors,omitempty"`
-	RawText    string   `json:"raw_text,omitempty"`
+	DateFound  bool              `json:"date_found"`
+	DateValid  bool              `json:"date_valid"`
+	DocDate    string            `json:"doc_date,omitempty"`
+	ExpiryDate string            `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
+	IssueDate  string            `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
+	BirthDate  string            `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
+	Unreadable bool              `json:"unreadable,omitempty"`  // document illisible, review humaine requise
+	MRZValid   bool              `json:"mrz_valid,omitempty"`   // MRZ détectée et chiffres de contrôle ICAO 9303 vérifiés
+	MRZFields  map[string]string `json:"mrz_fields,omitempty"`  // champs décodés depuis la MRZ quand mrz_valid
+	Errors     []string          `json:"errors,omitempty"`
+	RawText    string            `json:"raw_text,omitempty"`
 }
 
 // minOCRChars : seuil sous lequel on considère que l'OCR a échoué.
@@ -434,6 +436,22 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 
 	// 1. Détection du type de document
 	result.DocType = DetectDocType(text)
+
+	// 1bis. Validation MRZ ICAO 9303 quand un document d'identité est suspecté.
+	// La MRZ contient des chiffres de contrôle : si ça passe, l'OCR est correct
+	// au caractère près. Signal de confiance fort pour le verdict.
+	if mrzOK, mrzFields := validateMRZ(text); mrzOK {
+		result.MRZValid = true
+		result.MRZFields = mrzFields
+		if result.DocType == DocTypeUnknown {
+			switch mrzFields["format"] {
+			case "TD3":
+				result.DocType = DocTypePassport
+			case "TD1":
+				result.DocType = DocTypeID
+			}
+		}
+	}
 
 	// 1. Recherche du nom (et prénom si fourni)
 	nameFound, surnameFound, nameMsg := searchName(text, input.Name, input.Surname)
