@@ -1,0 +1,162 @@
+{
+  "_meta": {
+    "version": "2026-05-27",
+    "samples_dir": "/Users/dev/Desktop/LLM/ocr/samples",
+    "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, etc.). Compléter les dates au fil des inspections manuelles."
+  },
+  "samples": {
+    "edf": {
+      "file": "facture-EDF.jpg",
+      "input": {
+        "name": "DUPONT",
+        "postal_code": "31520"
+      },
+      "expected": {
+        "doc_type": "facture",
+        "name_found": true,
+        "postal_found": true,
+        "date_found": true,
+        "ok": false,
+        "unreadable": false
+      },
+      "notes": "Facture EDF datée mars 2025 — dépasse valid_months=3 → ok:false légitime"
+    },
+    "freepro": {
+      "file": "Facture_FreePro_F202603049358_20260301.pdf",
+      "input": {
+        "name": "ORBINEA",
+        "postal_code": "99000"
+      },
+      "expected": {
+        "doc_type": "facture",
+        "name_found": true,
+        "postal_found": true,
+        "date_found": true,
+        "doc_date": "01/03/2026",
+        "ok": true,
+        "unreadable": false
+      },
+      "notes": "PDF natif → pdftotext suffit, pas de LLM"
+    },
+    "sfr": {
+      "file": "sfr-facture-1.pdf",
+      "input": {
+        "name": "ORBINEA",
+        "postal_code": "99000"
+      },
+      "expected": {
+        "doc_type": "facture",
+        "name_found": true,
+        "postal_found": true,
+        "date_found": true,
+        "ok": null,
+        "unreadable": false
+      },
+      "notes": "ok dépend de la date au moment du test, à compléter manuellement"
+    },
+    "lucie": {
+      "file": "carte_identite_Lucie.jpg",
+      "input": {
+        "name": "DELAUNAY",
+        "surname": "LUCIE"
+      },
+      "expected": {
+        "doc_type": "carte_identite",
+        "name_found": true,
+        "surname_found": true,
+        "date_found": true,
+        "ok": true,
+        "unreadable": false
+      },
+      "notes": "CNI française moderne, fond clair, Tesseract devrait suffire"
+    },
+    "cni8493": {
+      "file": "index_8493_1_1200.png",
+      "input": {
+        "name": "BEN AMAR"
+      },
+      "expected": {
+        "doc_type": "passeport",
+        "name_found": true,
+        "date_found": true,
+        "ok": true,
+        "unreadable": false
+      },
+      "notes": "Passeport marocain BEN AMAR. Sample qui timeoute sur Qwen-32B (GPU hang Metal). Idéal pour tester la robustesse multi-modèles."
+    },
+    "cni8498": {
+      "file": "index_8498_1_1200.png",
+      "input": {
+        "name": "DELAUNAY",
+        "surname": "CAMILLE"
+      },
+      "expected": {
+        "doc_type": "carte_identite",
+        "name_found": true,
+        "surname_found": true,
+        "date_found": true,
+        "ok": true,
+        "unreadable": false
+      },
+      "notes": "CNI biométrique française, MRZ TD1 vérifiable"
+    },
+    "justif-jpg": {
+      "file": "justifs.jpg",
+      "input": {
+        "name": "LEROY",
+        "surname": "PIERRE",
+        "postal_code": "17999"
+      },
+      "expected": {
+        "doc_type": "facture",
+        "name_found": true,
+        "surname_found": true,
+        "postal_found": true,
+        "date_found": true,
+        "ok": null,
+        "unreadable": false
+      },
+      "notes": "ok dépend de la date, à compléter"
+    },
+    "justif-pdf": {
+      "file": "justif2.pdf",
+      "input": {
+        "name": "ORBINEA",
+        "postal_code": "99000"
+      },
+      "expected": {
+        "doc_type": "facture",
+        "name_found": false,
+        "postal_found": true,
+        "date_found": true,
+        "ok": false,
+        "unreadable": false
+      },
+      "notes": "Le nom ORBINEA n'est pas dans ce justif → name_found doit être false et ok:false"
+    },
+    "solange": {
+      "file": "carte_identite_Solange.png",
+      "input": {
+        "name": "SOLANGE"
+      },
+      "expected": {
+        "doc_type": "carte_identite",
+        "name_found": true,
+        "date_found": true,
+        "ok": true,
+        "unreadable": false
+      },
+      "notes": "CNI Solange, sample ajouté le 2026-05-26 (2.6 Mo). Vérifier doc_type et MRZ."
+    },
+    "impot": {
+      "file": "impot_exemple.pdf",
+      "input": {},
+      "expected": {
+        "doc_type": "courrier",
+        "ok": null,
+        "unreadable": false
+      },
+      "notes": "PDF avis d'impôt, texte natif. Pas de champs name/postal en input — surtout vérifier que le LLM ne hallucine pas. À compléter selon ce qu'on attend du contrat Regia."
+    }
+  }
+}

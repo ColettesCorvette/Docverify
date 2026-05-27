@@ -2,6 +2,7 @@ package docverify
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -9,6 +10,15 @@ import (
 	"path/filepath"
 	"time"
 )
+
+// statusClientClosed est le code non-standard utilisé pour signaler qu'un
+// client a fermé sa connexion avant la fin du traitement (convention nginx).
+const statusClientClosed = 499
+
+// maxUploadBytes borne la taille acceptée d'un upload multipart. Au-delà,
+// http.MaxBytesReader court-circuite la requête sans charger l'intégralité
+// du body en mémoire.
+const maxUploadBytes = 30 << 20
 
 // DefaultLLMURL retourne l'URL de l'endpoint LLM OpenAI-compatible par défaut.
 // Variable d'env : LLM_URL. Fallback : vllm-mlx local sur :8000.
@@ -88,6 +98,7 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 // dans la queue in-process et attend le verdict d'un worker.
 func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			writeJSONError(w, http.StatusBadRequest, "Erreur lors de l'analyse du formulaire")
 			return
@@ -100,12 +111,12 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 		}
 		defer file.Close()
 
-		destinationPath := filepath.Join("/tmp", header.Filename)
-		dst, err := os.Create(destinationPath)
+		dst, err := os.CreateTemp("", "docverify-*"+filepath.Ext(header.Filename))
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
 			return
 		}
+		destinationPath := dst.Name()
 		if _, err := io.Copy(dst, file); err != nil {
 			dst.Close()
 			os.Remove(destinationPath)
@@ -139,12 +150,37 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 
 		res := q.Submit(r.Context(), job)
 		if res.Err != nil {
-			writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline: "+res.Err.Error())
+			handlePipelineError(w, res.Err)
 			return
 		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(res.Analysis)
+	}
+}
+
+// handlePipelineError traduit les erreurs queue en réponses HTTP utiles pour
+// Regia. Le timeout pipeline devient un verdict unreadable HTTP 200 plutôt
+// qu'un 500 : le doc fait crasher / saturer le LLM, mais le service répond
+// correctement et Regia route vers la review manuelle.
+func handlePipelineError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, errClientGone):
+		log.Printf("Client déconnecté avant la fin du pipeline: %v", err)
+		w.WriteHeader(statusClientClosed)
+	case errors.Is(err, errQueueFull):
+		writeJSONError(w, http.StatusServiceUnavailable, err.Error())
+	case errors.Is(err, errTimeout):
+		log.Printf("Pipeline timeout (>%s) — verdict unreadable renvoyé", jobTimeout)
+		unreadable := AnalysisResult{
+			DocType:    DocTypeUnknown,
+			Unreadable: true,
+			Errors:     []string{"Document non analysable dans le délai imparti — review manuelle requise"},
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(unreadable)
+	default:
+		writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline: "+err.Error())
 	}
 }
 

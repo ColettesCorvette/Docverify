@@ -5,8 +5,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -96,7 +98,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
-		MaxTokens:   500,
+		MaxTokens:   2000,
 		Temperature: 0,
 		Stream:      false,
 	}
@@ -110,13 +112,8 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 	defer cancel()
 
 	apiURL := strings.TrimRight(llmURL, "/") + "/v1/chat/completions"
-	req, err := http.NewRequestWithContext(reqCtx, http.MethodPost, apiURL, bytes.NewReader(body))
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := llmHTTPClient.Do(req)
+	resp, err := postLLMWithRetry(reqCtx, apiURL, body)
 	if err != nil {
 		if reqCtx.Err() == context.DeadlineExceeded {
 			return "", fmt.Errorf("timeout dépassé (3 min)")
@@ -153,6 +150,49 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 
 	fmt.Printf("   OCR terminé (%d caractères)\n", len(text))
 	return text, nil
+}
+
+// postLLMWithRetry envoie une requête POST au LLM et retente une fois en cas
+// d'erreur transient typique d'un keepalive cassé : EOF, connection reset,
+// broken pipe. Le retry est ignoré si le contexte est déjà annulé ou si
+// l'erreur n'est pas marquée transient. Le body est re-emballé dans un
+// bytes.Reader frais à chaque tentative.
+func postLLMWithRetry(ctx context.Context, apiURL string, body []byte) (*http.Response, error) {
+	resp, err := doLLMPost(ctx, apiURL, body)
+	if err == nil {
+		return resp, nil
+	}
+	if ctx.Err() != nil || !isRetryableLLMErr(err) {
+		return nil, err
+	}
+	log.Printf("LLM erreur transient (%v) — retry une fois", err)
+	return doLLMPost(ctx, apiURL, body)
+}
+
+func doLLMPost(ctx context.Context, apiURL string, body []byte) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, apiURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	return llmHTTPClient.Do(req)
+}
+
+// isRetryableLLMErr matche les erreurs transient connues : keepalive cassé
+// après crash vllm-mlx, reset TCP, broken pipe. Les timeouts contextuels ne
+// sont pas retentés.
+func isRetryableLLMErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		return true
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "EOF") ||
+		strings.Contains(msg, "connection reset") ||
+		strings.Contains(msg, "broken pipe") ||
+		strings.Contains(msg, "use of closed network connection")
 }
 
 // pingLLM vérifie que l'endpoint LLM répond sur /v1/models. Hérite du
