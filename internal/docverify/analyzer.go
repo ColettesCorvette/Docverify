@@ -34,9 +34,7 @@ type AnalysisResult struct {
 	ExpiryDate string            `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
 	IssueDate  string            `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
 	BirthDate  string            `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
-	Unreadable bool              `json:"unreadable,omitempty"`  // document illisible, review humaine requise
-	MRZValid   bool              `json:"mrz_valid,omitempty"`   // MRZ détectée et chiffres de contrôle ICAO 9303 vérifiés
-	MRZFields  map[string]string `json:"mrz_fields,omitempty"`  // champs décodés depuis la MRZ quand mrz_valid
+	Unreadable bool              `json:"unreadable,omitempty"` // document illisible, review humaine requise
 	Errors     []string          `json:"errors,omitempty"`
 	RawText    string            `json:"raw_text,omitempty"`
 }
@@ -49,10 +47,12 @@ const minOCRChars = 30
 
 // Mots-clés par type de document.
 //
-// TODO: ajouter une détection MRZ par regex `^P<[A-Z]{3}` pour reconnaître
-// n'importe quel passeport indépendamment de la langue. Cas réel : passeports
-// marocains (BEN AMAR) où le LLM ne transcrit pas "passport"/"passeport"
-// et où le doc tombe en doc_type=inconnu.
+// Piste si besoin : détecter un passeport étranger par une simple regex
+// `^P<[A-Z]{3}` sur une ligne MRZ, pour le cas où le LLM ne transcrit pas
+// "passport"/"passeport" (passeports marocains type BEN AMAR → doc_type
+// inconnu). Détection légère uniquement : la validation des chiffres de
+// contrôle ICAO a été retirée le 2026-05-28 car l'OCR n'est jamais parfait
+// au caractère près, donc elle ne passait quasi jamais.
 var docTypeKeywords = map[DocType][]string{
 	DocTypePassport: {"passport", "passeport", "travel document", "mrz", "p<mar", "p<fra", "p<bel", "nationality", "nationalité", "date of expiry", "date d'expiration"},
 	DocTypeID: {
@@ -150,25 +150,6 @@ var dateTokenRe = regexp.MustCompile(
 		`|\b(\d{1,2}\s+(?:janvier|f[eé]vrier|mars|avril|mai|juin|juillet|ao[uû]t|septembre|octobre|novembre|d[eé]cembre|january|february|march|april|may|june|july|august|september|october|november|december)\s+\d{4})\b`,
 )
 
-// extractAllDates retourne toutes les dates trouvées dans le texte.
-func extractAllDates(text string) []time.Time {
-	normalized := strings.Join(strings.Fields(text), " ")
-	matches := dateTokenRe.FindAllString(strings.ToLower(normalized), -1)
-	var dates []time.Time
-	seen := map[string]bool{}
-	for _, match := range matches {
-		match = strings.TrimSpace(match)
-		if seen[match] {
-			continue
-		}
-		seen[match] = true
-		if t, ok := parseDate(match); ok {
-			dates = append(dates, t)
-		}
-	}
-	return dates
-}
-
 // normalizeRawDate convertit les formats de date non-standard en DD/MM/YYYY
 // pour faciliter le parsing.
 func normalizeRawDate(s string) string {
@@ -191,36 +172,6 @@ var (
 	spaceRe     = regexp.MustCompile(`^\d{2}\s+\d{2}\s+\d{4}$`)
 	collapsedRe = regexp.MustCompile(`^\d{8}$`)
 )
-
-// extractAllDatesWithRaw retourne toutes les dates avec leur représentation textuelle.
-func extractAllDatesWithRaw(text string) []struct {
-	T   time.Time
-	Raw string
-} {
-	normalized := strings.Join(strings.Fields(text), " ")
-	matches := dateTokenRe.FindAllString(strings.ToLower(normalized), -1)
-	var result []struct {
-		T   time.Time
-		Raw string
-	}
-	seen := map[string]bool{}
-	for _, match := range matches {
-		raw := strings.TrimSpace(match)
-		if seen[raw] {
-			continue
-		}
-		seen[raw] = true
-		// Normaliser avant parsing
-		normalized := normalizeRawDate(raw)
-		if t, ok := parseDate(normalized); ok {
-			result = append(result, struct {
-				T   time.Time
-				Raw string
-			}{t, raw})
-		}
-	}
-	return result
-}
 
 // Patterns de labels précédant une date sur les documents d'identité.
 // On cherche le label dans les ~60 caractères avant la date dans le texte normalisé.
@@ -437,33 +388,13 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 	// 1. Détection du type de document
 	result.DocType = DetectDocType(text)
 
-	// 1bis. Validation MRZ ICAO 9303 quand un document d'identité est suspecté.
-	// La MRZ contient des chiffres de contrôle : si ça passe, l'OCR est correct
-	// au caractère près. Signal de confiance fort pour le verdict.
-	if mrzOK, mrzFields := validateMRZ(text); mrzOK {
-		result.MRZValid = true
-		result.MRZFields = mrzFields
-		if result.DocType == DocTypeUnknown {
-			switch mrzFields["format"] {
-			case "TD3":
-				result.DocType = DocTypePassport
-			case "TD1":
-				result.DocType = DocTypeID
-			}
-		}
-	}
-
-	// 1. Recherche du nom (et prénom si fourni)
-	nameFound, surnameFound, nameMsg := searchName(text, input.Name, input.Surname)
+	// 2. Recherche du nom (et prénom si fourni). Le verdict final décide si
+	// l'absence est rédhibitoire ; ici on se contente d'extraire.
+	nameFound, surnameFound, _ := searchName(text, input.Name, input.Surname)
 	result.NameFound = nameFound
 	if input.Surname != "" {
 		result.HasSurname = true
 		result.SurnameFound = surnameFound
-	}
-	// Valider : si prénom fourni, les deux doivent être trouvés
-	nameOK := nameFound && (input.Surname == "" || surnameFound)
-	if !nameOK {
-		result.Errors = append(result.Errors, nameMsg)
 	}
 
 	// 2. Code postal — non applicable pour passeports et CNI
@@ -480,9 +411,6 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 		if foundPostal != "" {
 			result.PostalFound = true
 			result.PostalMatch = foundPostal
-		} else {
-			result.Errors = append(result.Errors,
-				fmt.Sprintf("Aucun des codes postaux %v trouvé dans le document", input.PostalCodes))
 		}
 	}
 
@@ -494,11 +422,9 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 
 	switch result.DocType {
 	case DocTypePassport, DocTypeID:
-		// Pour les documents d'identité : chercher la date d'émission et d'expiration
+		// Documents d'identité : dates d'émission, d'expiration et de naissance.
 		docDate, rawDate, issueRaw, expiryRaw, birthRaw, found := extractDateForPassport(text)
-		if !found {
-			result.Errors = append(result.Errors, "Aucune date trouvée dans le document")
-		} else {
+		if found {
 			result.DateFound = true
 			result.DocDate = formatDate(rawDate)
 			if issueRaw != "" {
@@ -509,50 +435,29 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 			}
 			if expiryRaw != "" {
 				result.ExpiryDate = formatDate(expiryRaw)
-				// Validité passeport : date d'expiration dans le futur
-				expiryTime, ok := func() (time.Time, bool) {
-					t, ok := parseDate(expiryRaw)
-					return t, ok
-				}()
-				if ok && expiryTime.After(time.Now()) {
+				// Valide si la date d'expiration est dans le futur.
+				if t, ok := parseDate(expiryRaw); ok && t.After(time.Now()) {
 					result.DateValid = true
-				} else {
-					result.Errors = append(result.Errors,
-						fmt.Sprintf("Document expiré : expiration=%s", expiryRaw))
 				}
 			} else {
-				// Pas d'expiration trouvée : utiliser la date d'émission + validité
-				limit := time.Now().AddDate(0, -validMonths, 0)
-				if docDate.After(limit) {
+				// Sans expiration : date d'émission + fenêtre de validité.
+				if docDate.After(time.Now().AddDate(0, -validMonths, 0)) {
 					result.DateValid = true
-				} else {
-					result.Errors = append(result.Errors,
-						fmt.Sprintf("Document trop ancien : date=%s, limite=%s (%d mois)",
-							docDate.Format("02/01/2006"), limit.Format("02/01/2006"), validMonths))
 				}
 			}
 		}
 
 	default:
-		// Factures, courriers : première date trouvée
+		// Factures, courriers : première date trouvée + fenêtre de validité.
 		docDate, rawDate, found := extractDate(text)
-		if !found {
-			result.Errors = append(result.Errors, "Aucune date trouvée dans le document")
-		} else {
+		if found {
 			result.DateFound = true
 			result.DocDate = formatDate(rawDate)
-			limit := time.Now().AddDate(0, -validMonths, 0)
-			if docDate.After(limit) {
+			if docDate.After(time.Now().AddDate(0, -validMonths, 0)) {
 				result.DateValid = true
-			} else {
-				result.Errors = append(result.Errors,
-					fmt.Sprintf("Document trop ancien : date=%s, limite=%s (%d mois)",
-						docDate.Format("02/01/2006"), limit.Format("02/01/2006"), validMonths))
 			}
 		}
 	}
-
-	surnameOK := input.Surname == "" || result.SurnameFound
 
 	// Document illisible : type inconnu ET aucun signal exploitable.
 	// On ne refuse pas sèchement : on marque pour review humaine côté Regia.
@@ -563,27 +468,118 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 		return result
 	}
 
-	switch result.DocType {
-	case DocTypePassport, DocTypeID:
-		// CNI / Passeport : prouve l'existence de la personne
-		// ✅ requis  : nom, prénom (si fourni), date de naissance, document non expiré
-		// ❌ ignoré  : date "récente de moins de N mois" (non pertinent)
-		// ❌ ignoré  : code postal (n'existe pas sur ce type de document)
-		result.OK = result.NameFound && surnameOK && result.DateValid
-		// DateValid = non expiré (géré dans le switch ci-dessus)
+	// Verdict : contrôles implicites dérivés du type détecté, évalués par
+	// l'unique fonction de décision partagée avec le mode batch.
+	result.OK, result.Errors = evaluateVerdict(result, verdictSpec{
+		checks:      defaultChecks(result.DocType, input.Surname != ""),
+		name:        input.Name,
+		surname:     input.Surname,
+		postalCodes: input.PostalCodes,
+	})
+	return result
+}
 
-	case DocTypeInvoice, DocTypeLetter:
-		// Facture / Courrier : justificatif de domicile récent
-		// ✅ requis  : nom, code postal (si fourni), date récente
-		// ❌ ignoré  : date de naissance (n'existe pas sur ce type de document)
-		result.OK = result.NameFound && surnameOK && result.PostalFound && result.DateFound && result.DateValid
+// verdictSpec décrit les contrôles à appliquer pour rendre un verdict et les
+// valeurs attendues servant aux messages. C'est l'unique entrée de
+// evaluateVerdict, partagée par le mode mono-document (AnalyzeText, checks
+// dérivés du type) et le mode batch (EvaluateChecks, checks explicites).
+type verdictSpec struct {
+	checks        []string
+	name          string
+	surname       string
+	postalCodes   []string
+	cities        []string
+	expectedBirth string
+}
 
-	default:
-		// Type inconnu : tout vérifier
-		result.OK = result.NameFound && surnameOK && result.PostalFound && result.DateFound && result.DateValid
+// defaultChecks retourne les contrôles implicites du mode mono-document selon
+// le type détecté : un document d'identité prouve l'existence d'une personne
+// (nom + document non expiré), un justificatif de domicile exige en plus le
+// code postal. Le prénom n'est contrôlé que s'il a été fourni.
+func defaultChecks(docType DocType, hasSurname bool) []string {
+	checks := []string{"name"}
+	if hasSurname {
+		checks = append(checks, "surname")
+	}
+	if docType != DocTypePassport && docType != DocTypeID {
+		checks = append(checks, "postal")
+	}
+	return append(checks, "date")
+}
+
+// evaluateVerdict est l'unique source de vérité du verdict. Il lit les champs
+// déjà extraits dans AnalysisResult et décide, contrôle par contrôle, si le
+// document satisfait ceux demandés, en ignorant ceux qui ne s'appliquent pas
+// au type détecté (code postal sur une CNI, naissance sur une facture).
+func evaluateVerdict(a AnalysisResult, spec verdictSpec) (bool, []string) {
+	isIdentity := a.DocType == DocTypePassport || a.DocType == DocTypeID
+	isAddress := a.DocType == DocTypeInvoice || a.DocType == DocTypeLetter
+
+	want := map[string]bool{}
+	for _, c := range spec.checks {
+		want[c] = true
 	}
 
-	return result
+	ok := true
+	var errs []string
+	fail := func(msg string) {
+		ok = false
+		errs = append(errs, msg)
+	}
+
+	if want["name"] && !a.NameFound {
+		fail(fmt.Sprintf("Nom '%s' non trouvé", spec.name))
+	}
+	if want["surname"] && !a.SurnameFound {
+		fail(fmt.Sprintf("Prénom '%s' non trouvé", spec.surname))
+	}
+	if want["postal"] && !isIdentity && !a.PostalFound {
+		fail(fmt.Sprintf("Aucun des codes postaux %v trouvé dans le document", spec.postalCodes))
+	}
+	if want["city"] && !isIdentity {
+		found := false
+		for _, city := range spec.cities {
+			if city != "" && strings.Contains(strings.ToUpper(a.RawText), strings.ToUpper(city)) {
+				found = true
+				break
+			}
+		}
+		if !found {
+			fail(fmt.Sprintf("Ville %v non trouvée", spec.cities))
+		}
+	}
+	if want["date"] {
+		switch {
+		case isIdentity && !a.DateValid:
+			if a.ExpiryDate != "" {
+				fail(fmt.Sprintf("Document expiré (expiration : %s)", a.ExpiryDate))
+			} else {
+				fail("Document expiré ou date d'expiration non trouvée")
+			}
+		case !isIdentity && !a.DateFound:
+			fail("Date du document non trouvée")
+		case !isIdentity && !a.DateValid:
+			fail("Document trop ancien")
+		}
+	}
+	if want["birth_date"] && !isAddress {
+		switch {
+		case spec.expectedBirth == "" && a.BirthDate == "":
+			fail("Date de naissance non trouvée dans le document")
+		case spec.expectedBirth != "" && normalizeBirth(a.BirthDate) != normalizeBirth(spec.expectedBirth):
+			fail(fmt.Sprintf("Date de naissance attendue '%s', trouvée '%s'", spec.expectedBirth, a.BirthDate))
+		}
+	}
+	return ok, errs
+}
+
+// normalizeBirth ramène une date de naissance à un format comparable
+// (séparateurs uniformisés, minuscules) pour confronter attendu et extrait.
+func normalizeBirth(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.ReplaceAll(s, " ", "/")
+	s = strings.ReplaceAll(s, "-", "/")
+	return strings.ToLower(s)
 }
 
 // ── Types métier ──────────────────────────────────────────────────────────────
@@ -667,92 +663,19 @@ func BuildInput(ind Individual, doc Document, batch BatchInput) Input {
 	return input
 }
 
-// EvaluateChecks évalue uniquement les checks demandés sur l'analyse,
-// en tenant compte du type de document détecté pour ignorer les checks non pertinents.
+// EvaluateChecks applique les contrôles explicites d'un document de batch via
+// l'unique fonction de verdict partagée avec AnalyzeText. Les valeurs attendues
+// (nom, code postal, ville, naissance) proviennent de l'individu.
 func EvaluateChecks(analysis AnalysisResult, doc Document, ind Individual) DocResult {
-	checksSet := map[string]bool{}
-	for _, c := range doc.Checks {
-		checksSet[c] = true
-	}
-
-	isIdentityDoc := analysis.DocType == DocTypePassport || analysis.DocType == DocTypeID
-	isAddressDoc := analysis.DocType == DocTypeInvoice || analysis.DocType == DocTypeLetter
-
-	ok := true
-	var errors []string
-
-	if checksSet["name"] && !analysis.NameFound {
-		ok = false
-		errors = append(errors, fmt.Sprintf("Nom '%s' non trouvé", ind.Name))
-	}
-	if checksSet["surname"] && !analysis.SurnameFound {
-		ok = false
-		errors = append(errors, fmt.Sprintf("Prénom '%s' non trouvé", ind.Surname))
-	}
-	if checksSet["postal"] {
-		if isIdentityDoc {
-			analysis.PostalFound = true
-		} else if !analysis.PostalFound {
-			ok = false
-			errors = append(errors, fmt.Sprintf("Code postal %v non trouvé", ind.PostalCodes))
-		}
-	}
-	if checksSet["city"] && !isIdentityDoc {
-		cityFound := false
-		for _, city := range ind.Cities {
-			if strings.Contains(strings.ToUpper(analysis.RawText), strings.ToUpper(city)) {
-				cityFound = true
-				break
-			}
-		}
-		if !cityFound {
-			ok = false
-			errors = append(errors, fmt.Sprintf("Ville %v non trouvée", ind.Cities))
-		}
-	}
-	if checksSet["date"] {
-		if isIdentityDoc {
-			if !analysis.DateValid {
-				ok = false
-				if analysis.ExpiryDate != "" {
-					errors = append(errors, fmt.Sprintf("Document expiré (expiration : %s)", analysis.ExpiryDate))
-				} else {
-					errors = append(errors, "Document expiré ou date d'expiration non trouvée")
-				}
-			}
-		} else if !analysis.DateFound || !analysis.DateValid {
-			ok = false
-			if !analysis.DateFound {
-				errors = append(errors, "Date du document non trouvée")
-			} else {
-				errors = append(errors, "Document trop ancien")
-			}
-		}
-	}
-	if checksSet["birth_date"] && !isAddressDoc {
-		if ind.BirthDate == "" {
-			if analysis.BirthDate == "" {
-				ok = false
-				errors = append(errors, "Date de naissance non trouvée dans le document")
-			}
-		} else {
-			norm := func(s string) string {
-				s = strings.TrimSpace(s)
-				s = strings.ReplaceAll(s, " ", "/")
-				s = strings.ReplaceAll(s, "-", "/")
-				return strings.ToLower(s)
-			}
-			birthOK := analysis.BirthDate != "" && norm(analysis.BirthDate) == norm(ind.BirthDate)
-			if !birthOK {
-				ok = false
-				errors = append(errors, fmt.Sprintf(
-					"Date de naissance attendue '%s', trouvée '%s'",
-					ind.BirthDate, analysis.BirthDate))
-			}
-		}
-	}
-
-	analysis.Errors = errors
+	ok, errs := evaluateVerdict(analysis, verdictSpec{
+		checks:        doc.Checks,
+		name:          ind.Name,
+		surname:       ind.Surname,
+		postalCodes:   ind.PostalCodes,
+		cities:        ind.Cities,
+		expectedBirth: ind.BirthDate,
+	})
+	analysis.Errors = errs
 	analysis.OK = ok
 
 	return DocResult{
@@ -761,7 +684,7 @@ func EvaluateChecks(analysis AnalysisResult, doc Document, ind Individual) DocRe
 		IndividualID: ind.ID,
 		Checks:       doc.Checks,
 		OK:           ok,
-		Errors:       errors,
+		Errors:       errs,
 		Analysis:     analysis,
 	}
 }

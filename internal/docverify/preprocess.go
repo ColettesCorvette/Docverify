@@ -53,49 +53,31 @@ func isImageMagickAvailable() bool {
 	return err == nil
 }
 
-// Seuils de taille du fichier source pour décider du pipeline de
-// prétraitement avant envoi au LLM. Calibré sur les observations cluster
-// du 2026-05-27 :
-//   - Qwen-7B accepte sans broncher jusqu'à ~3 Mo de base64.
-//   - L'upscale 200% sur une image > 1 Mo gonfle au-delà → GPU hang Metal
-//     (cas cni8493 sous Qwen-32B).
-//   - solange (2.6 Mo, 2480x3508, 8.7 MP) sans préprocess donne un OCR
-//     dégradé : Qwen-7B trouve le nom mais rate doc_type et date.
-const (
-	llmPreprocessLightLimit = 1 << 20       // 1 Mo : bascule en mode léger
-	llmPreprocessSkipLimit  = 3 * (1 << 20) // 3 Mo : skip total
-)
+// llmDownscaleLimit borne la taille du fichier source au-delà de laquelle on
+// réduit la définition avant l'envoi au LLM. Un base64 trop lourd fait hang
+// le GPU Metal de vllm-mlx (observé en cluster sur des scans > 2 Mo).
+const llmDownscaleLimit = 2 * (1 << 20) // 2 Mo
 
-// preprocessForLLM améliore une image avant l'envoi au LLM vision.
+// preprocessForLLM prépare une image pour l'envoi au LLM vision.
 //
-// Trois régimes selon la taille du fichier source :
+// Par défaut l'image est transmise telle quelle : un VLM lit mieux l'original
+// qu'une version retouchée. Le sharpen (unsharp/despeckle) est un réflexe
+// hérité de Tesseract qui dégrade la transcription LLM — il a causé la
+// régression cni8493 du 2026-05-27 et a donc été retiré.
 //
-//	< 1 Mo  : upscale 200% + unsharp + despeckle. Petite image, on grossit
-//	          pour rendre lisible les caractères fins MRZ et dates.
-//	1-3 Mo  : downscale à 2000 px max + unsharp + despeckle. Image déjà
-//	          grande, on évite d'exploser le base64 envoyé à vllm-mlx tout
-//	          en gardant un sharpen utile à l'OCR sur scan bruité.
-//	> 3 Mo  : skip total, image originale envoyée telle quelle. Au-delà,
-//	          aucune retouche ne sauve l'envoi.
+// Seule exception : si le fichier source dépasse llmDownscaleLimit, on réduit
+// la définition à 2000 px max (sans aucun filtre) pour éviter un base64 trop
+// lourd. Le suffixe `>` n'agit que si l'image dépasse la dimension.
 //
-// Le suffixe `>` sur `-resize` n'agit que si l'image dépasse la dimension,
-// donc une image 1200x800 source en mode léger ne sera pas redimensionnée.
-//
-// Retourne l'image originale si ImageMagick est absent ou si la conversion
-// échoue.
+// Retourne l'image originale si ImageMagick est absent, si l'image est sous le
+// seuil, ou si la conversion échoue.
 func preprocessForLLM(imagePath string) (string, func(), error) {
 	if !isImageMagickAvailable() {
 		return imagePath, func() {}, nil
 	}
 
 	info, err := os.Stat(imagePath)
-	if err != nil {
-		return imagePath, func() {}, nil
-	}
-
-	if info.Size() > llmPreprocessSkipLimit {
-		fmt.Printf("   Prétraitement LLM sauté: image source %.1f Mo > %d Mo\n",
-			float64(info.Size())/(1<<20), llmPreprocessSkipLimit>>20)
+	if err != nil || info.Size() <= llmDownscaleLimit {
 		return imagePath, func() {}, nil
 	}
 
@@ -110,25 +92,13 @@ func preprocessForLLM(imagePath string) (string, func(), error) {
 	}
 	outPath := filepath.Join(tmpDir, "llm"+ext)
 
-	var resizeArg, mode string
-	if info.Size() > llmPreprocessLightLimit {
-		resizeArg, mode = "2000x2000>", "léger"
-	} else {
-		resizeArg, mode = "200%", "upscale"
-	}
-	fmt.Printf("   Prétraitement LLM %s: resize %s + unsharp + despeckle (source %.1f Mo)\n",
-		mode, resizeArg, float64(info.Size())/(1<<20))
+	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 2000px avant LLM\n",
+		float64(info.Size())/(1<<20), llmDownscaleLimit>>20)
 
-	cmd := exec.Command("convert",
-		imagePath,
-		"-resize", resizeArg,
-		"-unsharp", "0x1",
-		"-despeckle",
-		outPath,
-	)
+	cmd := exec.Command("convert", imagePath, "-resize", "2000x2000>", outPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("   Prétraitement LLM échoué: %s\n", strings.TrimSpace(string(out)))
+		fmt.Printf("   Downscale LLM échoué: %s\n", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}, nil
 	}
