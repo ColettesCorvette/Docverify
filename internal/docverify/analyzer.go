@@ -45,14 +45,12 @@ const minOCRChars = 30
 
 // --- Détection du type de document ---
 
-// Mots-clés par type de document.
+// Mots-clés par type de document. Complété par la détection MRZ
+// (mrzIDRe, mrzPassportRe) qui prime quand les libellés sont illisibles.
 //
-// Piste si besoin : détecter un passeport étranger par une simple regex
-// `^P<[A-Z]{3}` sur une ligne MRZ, pour le cas où le LLM ne transcrit pas
-// "passport"/"passeport" (passeports marocains type BEN AMAR → doc_type
-// inconnu). Détection légère uniquement : la validation des chiffres de
-// contrôle ICAO a été retirée le 2026-05-28 car l'OCR n'est jamais parfait
-// au caractère près, donc elle ne passait quasi jamais.
+// La validation des chiffres de contrôle ICAO a été retirée le 2026-05-28
+// car l'OCR n'est jamais parfait au caractère près, donc elle ne passait
+// quasi jamais.
 var docTypeKeywords = map[DocType][]string{
 	DocTypePassport: {"passport", "passeport", "travel document", "mrz", "p<mar", "p<fra", "p<bel", "nationality", "nationalité", "date of expiry", "date d'expiration"},
 	DocTypeID: {
@@ -64,11 +62,33 @@ var docTypeKeywords = map[DocType][]string{
 	DocTypeLetter:  {"madame", "monsieur", "veuillez", "cordialement", "objet :", "courrier"},
 }
 
+// mrzIDRe matche le préfixe de la première ligne d'une MRZ TD1 de pièce
+// d'identité française (IDFRA...). Sur une CNI scannée, les libellés sont
+// souvent trop bruités pour le scoring par mots-clés alors que la MRZ reste
+// lisible. Tolère un caractère parasite entre ID et FRA inséré par l'OCR.
+var mrzIDRe = regexp.MustCompile(`ID.?FRA`)
+
+// mrzPassportRe matche la première ligne d'une MRZ de passeport (P<FRA,
+// P<MAR...). Le filler < est exigé pour ne pas matcher un mot courant tel
+// que PARIS. Même logique que la MRZ CNI : rattrape un libellé illisible.
+var mrzPassportRe = regexp.MustCompile(`P[A-Z]?<[A-Z]{3}`)
+
 // DetectDocType analyse le texte OCR et retourne le type de document le plus probable.
+//
+// La MRZ prime sur le scoring par mots-clés : un IDFRA ou un P<XXX est un
+// signal bien plus fiable que des libellés OCR bruités.
 //
 // L'itération sur scores se fait dans un ordre stable pour rendre le verdict
 // déterministe en cas d'égalité de scores entre deux types.
 func DetectDocType(text string) DocType {
+	upper := strings.ToUpper(text)
+	if mrzIDRe.MatchString(upper) {
+		return DocTypeID
+	}
+	if mrzPassportRe.MatchString(upper) {
+		return DocTypePassport
+	}
+
 	lower := strings.ToLower(text)
 	scores := map[DocType]int{}
 	for docType, keywords := range docTypeKeywords {
