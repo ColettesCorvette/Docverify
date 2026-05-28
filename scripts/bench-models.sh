@@ -55,9 +55,10 @@ run_one() {
 
     local tmp
     tmp="$(mktemp)"
-    local elapsed http_code
-    elapsed=$(curl -s -o "$tmp" -w "%{time_total}" -X POST "$API$ROUTE" "${form_args[@]}" || echo "ERR")
-    http_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$API$ROUTE" "${form_args[@]}" 2>/dev/null || echo "000")
+    local meta http_code elapsed
+    meta=$(curl -s -o "$tmp" -w "%{http_code} %{time_total}" -X POST "$API$ROUTE" "${form_args[@]}" || echo "000 0")
+    http_code="${meta%% *}"
+    elapsed="${meta##* }"
 
     local body
     body="$(cat "$tmp")"

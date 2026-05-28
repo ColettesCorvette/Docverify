@@ -78,6 +78,13 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 	processedPath, cleanup, _ := preprocessForLLM(imagePath)
 	defer cleanup()
 
+	if os.Getenv("DOCVERIFY_DEBUG_OCR") == "1" {
+		dst := filepath.Join("/tmp", fmt.Sprintf("docverify-sent-%d%s", time.Now().UnixNano(), filepath.Ext(processedPath)))
+		if data, rerr := os.ReadFile(processedPath); rerr == nil && os.WriteFile(dst, data, 0o644) == nil {
+			log.Printf("[DEBUG OCR] image envoyée au LLM: %s (source: %s)", dst, imagePath)
+		}
+	}
+
 	imgB64, err := encodeImageBase64(processedPath)
 	if err != nil {
 		return "", fmt.Errorf("encodage image: %w", err)

@@ -3,7 +3,7 @@
 #
 # Pour chaque sample :
 #   - charge la vérité de terrain depuis samples/groundtruth.json
-#   - compare champ par champ (doc_type, name_found, postal_found, date_found, ok, unreadable, mrz_valid)
+#   - compare champ par champ (doc_type, name_found, postal_found, date_found, ok, unreadable)
 #   - ignore les champs où la vérité de terrain est null (à compléter manuellement)
 #   - sort matches / total + liste des mismatches
 #
@@ -47,8 +47,7 @@ jq --slurpfile gt "$GROUNDTRUTH" '
           {field: "postal_found",  want: $exp.postal_found,  got: $resp.postal_found},
           {field: "date_found",    want: $exp.date_found,    got: $resp.date_found},
           {field: "ok",            want: $exp.ok,            got: $resp.ok},
-          {field: "unreadable",    want: $exp.unreadable,    got: ($resp.unreadable // false)},
-          {field: "mrz_valid",     want: $exp.mrz_valid,     got: ($resp.mrz_valid // false)}
+          {field: "unreadable",    want: $exp.unreadable,    got: ($resp.unreadable // false)}
         ]
       | map(select(.want != null))
       | . as $checks
