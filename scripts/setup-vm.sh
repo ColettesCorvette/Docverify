@@ -8,7 +8,9 @@
 #   - `xcode-select --install` fait + popup acceptée
 #
 # Usage côté host (depuis le repo docverify) :
-#   scp scripts/setup-vm.sh deploy/launchd/com.orbinea.vllm-mlx.plist test@<vm-ip>:~/
+#   scp scripts/setup-vm.sh scripts/vllm-watchdog.sh \
+#       deploy/launchd/com.orbinea.vllm-mlx.plist \
+#       deploy/launchd/com.orbinea.vllm-watchdog.plist test@<vm-ip>:~/
 #   ssh test@<vm-ip> 'bash ~/setup-vm.sh'
 
 set -euo pipefail
@@ -20,8 +22,25 @@ fi
 
 PLIST_LOCAL="$HOME/com.orbinea.vllm-mlx.plist"
 PLIST_DEST="/Library/LaunchDaemons/com.orbinea.vllm-mlx.plist"
+WD_PLIST_LOCAL="$HOME/com.orbinea.vllm-watchdog.plist"
+WD_PLIST_DEST="/Library/LaunchDaemons/com.orbinea.vllm-watchdog.plist"
 
 step() { printf "\n=== %s ===\n" "$1"; }
+
+# reload_daemon (re)charge un LaunchDaemon de façon idempotente. Sur un service
+# déjà actif, bootout est asynchrone : on attend son déchargement effectif avant
+# bootstrap, sinon launchctl renvoie "Bootstrap failed: 5: Input/output error".
+reload_daemon() {
+  local label="$1" dest="$2"
+  if sudo launchctl print "system/$label" >/dev/null 2>&1; then
+    sudo launchctl bootout "system/$label" 2>/dev/null || true
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+      sudo launchctl print "system/$label" >/dev/null 2>&1 || break
+      sleep 1
+    done
+  fi
+  sudo launchctl bootstrap system "$dest"
+}
 
 step "Homebrew"
 if ! command -v brew >/dev/null 2>&1; then
@@ -66,10 +85,18 @@ sudo chmod 644 "$PLIST_DEST"
 
 mkdir -p "$HOME/Library/Logs/vllm-mlx"
 
-if sudo launchctl print "system/com.orbinea.vllm-mlx" >/dev/null 2>&1; then
-  sudo launchctl bootout "system/com.orbinea.vllm-mlx" || true
+reload_daemon com.orbinea.vllm-mlx "$PLIST_DEST"
+
+step "Watchdog vllm-mlx (détection GPU hang)"
+if [[ -f "$HOME/vllm-watchdog.sh" && -f "$WD_PLIST_LOCAL" ]]; then
+  chmod +x "$HOME/vllm-watchdog.sh"
+  sudo cp "$WD_PLIST_LOCAL" "$WD_PLIST_DEST"
+  sudo chown root:wheel "$WD_PLIST_DEST"
+  sudo chmod 644 "$WD_PLIST_DEST"
+  reload_daemon com.orbinea.vllm-watchdog "$WD_PLIST_DEST"
+else
+  echo "Watchdog non déployé (vllm-watchdog.sh ou plist absent de ~)." >&2
 fi
-sudo launchctl bootstrap system "$PLIST_DEST"
 
 step "Validation"
 sleep 5

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.orbinea.vllm-watchdog</string>
+
+    <!-- Pas de UserName : tourne en root (system domain) pour pouvoir faire
+         launchctl kickstart sur system/com.orbinea.vllm-mlx. -->
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>/Users/test/vllm-watchdog.sh</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <!-- Relancé toutes les 30 s. Le comptage d'échecs consécutifs (THRESHOLD=3
+         dans le script) donne ~90 s avant kickstart : laisse passer le
+         chargement du modèle au boot sans faux positif. -->
+    <key>StartInterval</key>
+    <integer>30</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/test/Library/Logs/vllm-mlx/watchdog.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/test/Library/Logs/vllm-mlx/watchdog.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
