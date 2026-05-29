@@ -158,8 +158,8 @@ func parseDate(token string) (time.Time, bool) {
 }
 
 var dateTokenRe = regexp.MustCompile(
-	// DD/MM/YYYY ou DD-MM-YYYY
-	`\b(\d{1,2}[/\-]\d{1,2}[/\-]\d{4})\b` +
+	// DD/MM/YYYY, DD-MM-YYYY ou DD.MM.YYYY (point = format CNI française)
+	`\b(\d{1,2}[/.\-]\d{1,2}[/.\-]\d{4})\b` +
 		// YYYY/MM/DD ou YYYY-MM-DD
 		`|\b(\d{4}[/\-]\d{2}[/\-]\d{2})\b` +
 		// DD MM YYYY
@@ -185,12 +185,17 @@ func normalizeRawDate(s string) string {
 	if collapsedRe.MatchString(s) {
 		return s[0:2] + "/" + s[2:4] + "/" + s[4:]
 	}
+	// DD.MM.YYYY (points, format CNI française) → DD/MM/YYYY
+	if dotRe.MatchString(s) {
+		return strings.ReplaceAll(s, ".", "/")
+	}
 	return s
 }
 
 var (
 	spaceRe     = regexp.MustCompile(`^\d{2}\s+\d{2}\s+\d{4}$`)
 	collapsedRe = regexp.MustCompile(`^\d{8}$`)
+	dotRe       = regexp.MustCompile(`^\d{1,2}\.\d{1,2}\.\d{4}$`)
 )
 
 // Patterns de labels précédant une date sur les documents d'identité.

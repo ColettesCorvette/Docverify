@@ -45,6 +45,8 @@ fi
 # shellcheck disable=SC1091
 source "$HOME/vllm-mlx-env/bin/activate"
 uv pip install -e "$HOME/vllm-mlx[vision]"
+# transformers >=5.6 ignore silencieusement les kwargs du processor de mlx-vlm 0.5.0 -> vision en charabia
+uv pip install --no-deps "transformers==5.5.0"
 
 step "Modèle Qwen2.5-VL-7B-Instruct-4bit (pré-téléchargement)"
 python - <<'PY'
@@ -74,7 +76,7 @@ sleep 5
 sudo launchctl print "system/com.orbinea.vllm-mlx" | grep -E "state|active count|last exit" || true
 
 echo
-echo "Le modèle 32B prend 30-60 s à charger en MLX. Vérifie ensuite :"
+echo "Le modèle 7B prend 30-60 s à charger en MLX. Vérifie ensuite :"
 echo "  tail -f ~/Library/Logs/vllm-mlx/stderr.log"
 echo "  curl -s http://localhost:8000/v1/models | jq"
 echo

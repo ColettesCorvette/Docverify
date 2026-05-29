@@ -13,6 +13,12 @@
 
 set -euo pipefail
 
+if [[ "$(whoami)" != "test" ]]; then
+  echo "STOP : ce script zero-fill le disque et supprime des caches. Il doit tourner DANS la VM source (user 'test'), JAMAIS sur le host." >&2
+  echo "User actuel : $(whoami)" >&2
+  exit 1
+fi
+
 step() { printf "\n=== %s ===\n" "$1"; }
 
 step "Avant ménage"
@@ -22,6 +28,7 @@ step "Caches Python (uv, pip)"
 rm -rf "$HOME/.cache/uv" "$HOME/.cache/pip" 2>/dev/null || true
 
 step "Caches Homebrew"
+eval "$(/opt/homebrew/bin/brew shellenv)" 2>/dev/null || true
 brew cleanup -s 2>/dev/null || true
 rm -rf "$(brew --cache)" 2>/dev/null || true
 
@@ -41,11 +48,12 @@ sudo rm -rf /Library/Caches/* 2>/dev/null || true
 sudo rm -rf /private/var/folders/*/T/* 2>/dev/null || true
 
 step "Pré-shutdown : zero-fill des blocs libres APFS"
-echo "Ça va remplir / avec un fichier de zéros pour aider la compression oras."
-echo "Le fichier est supprimé immédiatement après."
-sudo dd if=/dev/zero of=/var/zerofile bs=1m status=progress 2>&1 || true
+echo "On remplit volontairement le disque de zéros pour aider la compression oras,"
+echo "puis on supprime le fichier. Le 'No space left on device' final est ATTENDU."
+sudo dd if=/dev/zero of=/var/zerofile bs=1m 2>/dev/null || true
 sudo rm -f /var/zerofile
 sync
+echo "zero-fill terminé."
 
 step "Après ménage"
 df -h / | tail -1
