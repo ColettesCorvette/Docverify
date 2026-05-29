@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -66,6 +67,14 @@ var llmHTTPClient = &http.Client{
 	},
 }
 
+// llmReqCounter génère un identifiant strictement croissant par requête LLM.
+// Il est injecté en fin de prompt pour rendre chaque requête unique : sans ça,
+// le prefix-caching de vllm-mlx (--continuous-batching) réutilise le cache KV
+// entre requêtes au prompt identique et fait FUITER le contenu image d'une
+// requête sur la suivante (ex. solange transcrite avec les données du passeport
+// cni8493). Un suffixe unique casse le préfixe commun et isole chaque requête.
+var llmReqCounter atomic.Uint64
+
 // RunLLM appelle l'endpoint OpenAI-compatible (vllm-mlx, vLLM, etc.)
 // pour transcrire l'image fournie. Le contexte propage l'annulation côté
 // client HTTP et le timeout global du job.
@@ -98,7 +107,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 		Messages: []chatMessage{{
 			Role: "user",
 			Content: []contentPart{
-				{Type: "text", Text: "Transcribe every word visible in this document image. Output only the raw text, no commentary."},
+				{Type: "text", Text: fmt.Sprintf("Transcribe every word visible in this document image. Output only the raw text, no commentary. [req:%d]", llmReqCounter.Add(1))},
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
