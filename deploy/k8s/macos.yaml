@@ -7,7 +7,7 @@ metadata:
 spec:
   containers:
   - name: macos
-    image: "localhost:5000/macos-vm:26.6"
+    image: "localhost:5000/macos-vm:26.7"
     imagePullPolicy: IfNotPresent
     ports:
     - name: http

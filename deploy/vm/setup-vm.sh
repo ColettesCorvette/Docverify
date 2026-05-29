@@ -8,9 +8,9 @@
 #   - `xcode-select --install` fait + popup acceptée
 #
 # Usage côté host (depuis le repo docverify) :
-#   scp scripts/setup-vm.sh scripts/vllm-watchdog.sh \
-#       deploy/launchd/com.orbinea.vllm-mlx.plist \
-#       deploy/launchd/com.orbinea.vllm-watchdog.plist test@<vm-ip>:~/
+#   scp deploy/vm/setup-vm.sh deploy/vm/vllm-watchdog.sh \
+#       deploy/vm/com.orbinea.vllm-mlx.plist \
+#       deploy/vm/com.orbinea.vllm-watchdog.plist test@<vm-ip>:~/
 #   ssh test@<vm-ip> 'bash ~/setup-vm.sh'
 
 set -euo pipefail

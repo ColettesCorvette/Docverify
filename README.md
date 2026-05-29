@@ -60,11 +60,11 @@ Deux scripts versionnés automatisent la majorité du setup :
 
 ```bash
 # Setup vllm-mlx + LaunchDaemon dans une VM fraîche (boot manuel obligatoire avant)
-scp scripts/setup-vm.sh deploy/launchd/com.orbinea.vllm-mlx.plist test@<vm-ip>:~/
+scp deploy/vm/setup-vm.sh deploy/vm/com.orbinea.vllm-mlx.plist test@<vm-ip>:~/
 ssh test@<vm-ip> 'bash ~/setup-vm.sh'
 
 # Ménage caches + zero-fill APFS juste avant capture OCI (gain ~10-20% sur compression)
-ssh test@<vm-ip> 'bash -s' < scripts/cleanup-vm.sh
+ssh test@<vm-ip> 'bash -s' < deploy/vm/cleanup-vm.sh
 ssh test@<vm-ip> 'sudo shutdown -h now'
 ```
 

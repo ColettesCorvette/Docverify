@@ -8,7 +8,7 @@
 #      ait le maximum d'entropie à compresser.
 #
 # Usage :
-#   ssh test@<vm-ip> 'bash -s' < scripts/cleanup-vm.sh
+#   ssh test@<vm-ip> 'bash -s' < deploy/vm/cleanup-vm.sh
 #   ssh test@<vm-ip> 'sudo shutdown -h now'
 
 set -euo pipefail
