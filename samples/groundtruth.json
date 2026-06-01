@@ -33,10 +33,10 @@
         "postal_found": true,
         "date_found": true,
         "doc_date": "01/03/2026",
-        "ok": true,
+        "ok": null,
         "unreadable": false
       },
-      "notes": "PDF natif → pdftotext suffit, pas de LLM"
+      "notes": "PDF natif → pdftotext suffit. ok=null car la validité dépend de la date du test : facture de mars 2026, dépasse valid_months=3 à partir de juin 2026 (même traitement que sfr/justif-jpg)."
     },
     "sfr": {
       "file": "sfr-facture-1.pdf",
