@@ -130,22 +130,31 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 	// rend un texte bruité (cas solange, CNI N&B 2480x3508), le LLM avec
 	// le contexte global peut extraire des champs que Tesseract rate.
 	if !usedLLM && scoreAnalysis(analysis) < segmentationTriggerScore && !IsPDF(job.FilePath) {
-		log.Printf("   Score initial=%d (Tesseract) — fallback LLM image entière",
-			scoreAnalysis(analysis))
-		llmText, llmErr := RunLLM(ctx, job.FilePath, job.Model, job.LLMURL)
-		if llmErr != nil {
-			log.Printf("   LLM full-page échoué: %v", llmErr)
-		} else if llmText != "" {
-			llmAnalysis := AnalyzeText(llmText, job.Input)
-			if debug {
-				debugLogRawText("llm-full", llmAnalysis)
-			}
-			if scoreAnalysis(llmAnalysis) > scoreAnalysis(analysis) {
-				log.Printf("   LLM full-page retenu: score %d -> %d",
-					scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
-				analysis = llmAnalysis
-			} else {
-				log.Printf("   LLM full-page n'améliore pas, conservation initiale")
+		// Sur un document multi-zones (recto+verso de CNI sur une A4), le LLM
+		// full-page est presque toujours supplanté par la segmentation. On le
+		// saute alors pour économiser un appel LLM et alléger la charge vllm
+		// sous rafale (detectRegions = ImageMagick, hors goulot LLM).
+		if regions, _ := detectRegions(job.FilePath); len(regions) >= 2 {
+			log.Printf("   Score initial=%d (Tesseract), %d zones — full-page sauté, segmentation directe",
+				scoreAnalysis(analysis), len(regions))
+		} else {
+			log.Printf("   Score initial=%d (Tesseract) — fallback LLM image entière",
+				scoreAnalysis(analysis))
+			llmText, llmErr := RunLLM(ctx, job.FilePath, job.Model, job.LLMURL)
+			if llmErr != nil {
+				log.Printf("   LLM full-page échoué: %v", llmErr)
+			} else if llmText != "" {
+				llmAnalysis := AnalyzeText(llmText, job.Input)
+				if debug {
+					debugLogRawText("llm-full", llmAnalysis)
+				}
+				if scoreAnalysis(llmAnalysis) > scoreAnalysis(analysis) {
+					log.Printf("   LLM full-page retenu: score %d -> %d",
+						scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
+					analysis = llmAnalysis
+				} else {
+					log.Printf("   LLM full-page n'améliore pas, conservation initiale")
+				}
 			}
 		}
 	}
