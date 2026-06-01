@@ -111,7 +111,14 @@ curl -s http://localhost:5000/v2/ && echo "registry OK"
 
 ## Push de l'image VM dans le registry
 
-**VM arrêtée obligatoire** sinon corruption du `disk.img` pendant le calcul des digests.
+**Recommandé : `scripts/recapture-vm.sh`** automatise toute la recapture (bump auto du tag, purge du registry, push, patch du manifeste, redeploy) avec garde-fous :
+
+```bash
+./scripts/recapture-vm.sh              # recapture complète depuis la VM source
+./scripts/recapture-vm.sh --push-only  # reprise : VM déjà arrêtée et nettoyée
+```
+
+Procédure manuelle équivalente (référence) — **VM arrêtée obligatoire** sinon corruption du `disk.img` pendant le calcul des digests.
 
 ```bash
 HW_MODEL=$(jq -r .hardwareModel ~/vm.json)
@@ -123,7 +130,7 @@ MACHINE_ID=$(jq -r .machineId ~/vm.json)
   --aux-path ~/aux.img \
   --hardware-model "$HW_MODEL" \
   --machine-id "$MACHINE_ID" \
-  localhost:5000/macos-vm:26.5
+  localhost:5000/macos-vm:26.8
 ```
 
 Le `--plain-http` est crucial (registry HTTP, pas TLS). Push de 5-15 min pour un disque de 100 Go (compression ~30-50 Go).
