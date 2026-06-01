@@ -23,6 +23,7 @@
         <string>--continuous-batching</string>
         <string>--max-num-seqs</string>
         <string>5</string>
+        <string>--disable-prefix-cache</string>
     </array>
 
     <key>EnvironmentVariables</key>
