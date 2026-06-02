@@ -23,6 +23,10 @@
         <string>--continuous-batching</string>
         <string>--max-num-seqs</string>
         <string>5</string>
+        <!-- Rempart anti-contamination. Sans ce flag, le prefix-cache multimodal
+             reutilise le KV des placeholders image entre requetes et fait fuiter
+             le contenu d'une image sur la suivante. NE PAS retirer : le client
+             docverify ne porte plus de nonce de secours dans son prompt. -->
         <string>--disable-prefix-cache</string>
     </array>
 
