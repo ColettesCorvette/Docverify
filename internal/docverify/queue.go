@@ -106,6 +106,16 @@ func (q *Queue) runWorker(id int) {
 func runPipeline(ctx context.Context, job Job) JobResult {
 	defer os.Remove(job.FilePath)
 
+	// 2D-DOC : cachet Datamatrix des justificatifs FR. Données signées, en clair
+	// → extraction fiable sans OCR ni LLM. Présent, on court-circuite tout le
+	// pipeline (la facture n'atteint jamais le LLM, ce qui décharge vllm-mlx).
+	// Absent ou illisible, on poursuit le pipeline OCR normal.
+	if analysis, ok := TryTwoDDOC(ctx, job.FilePath, job.Input); ok {
+		log.Printf("   2D-DOC détecté — pipeline court-circuité")
+		analysis.RawText = ""
+		return JobResult{Analysis: analysis}
+	}
+
 	var rawText string
 	var usedLLM bool
 	var err error

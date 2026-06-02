@@ -213,6 +213,17 @@ func runLegacy(data []byte) {
 	fmt.Printf("   Validité       : %d mois\n", input.ValidMonths)
 	fmt.Printf("   Modèle LLM     : %s\n\n", input.Model)
 
+	// 2D-DOC : si le justificatif porte un cachet Datamatrix, extraction directe
+	// (données signées) sans OCR ni LLM.
+	if result, ok := dc.TryTwoDDOC(context.Background(), input.DocumentPath, input); ok {
+		fmt.Println("2D-DOC détecté → extraction directe (OCR et LLM court-circuités)")
+		printResult(result)
+		if !result.OK {
+			os.Exit(1)
+		}
+		return
+	}
+
 	var rawText string
 	var extractErr error
 	if dc.IsPDF(input.DocumentPath) {

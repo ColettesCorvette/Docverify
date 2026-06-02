@@ -12,6 +12,8 @@ Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/do
 
 Regia envoie le document en POST sur l'API. Le handler dépose le job dans une queue in-process Go : un channel bufferisé alimenté par les requêtes HTTP et consommé par un pool de workers. Chaque worker exécute le pipeline OCR + analyse : extraction par `pdftotext` ou Tesseract sur les documents simples, fallback vers un LLM multimodal (Qwen2.5-VL-7B servi par vllm-mlx) pour les images et fonds complexes.
 
+En amont de l'OCR, le pipeline tente de lire un cachet **2D-DOC** (le Datamatrix signé apposé sur les justificatifs de domicile français) via `dmtxread` : s'il est présent, l'identité, l'adresse et la date d'émission sont extraites directement des données signées et tout le pipeline OCR/LLM est court-circuité — fiable et quasi instantané, ce qui décharge d'autant vllm-mlx.
+
 Si la première passe d'analyse renvoie un score d'information faible ou un verdict `unreadable`, le pipeline tente un second passage par segmentation : ImageMagick détecte les zones de contenu rectangulaires distinctes sur la page (typique d'un recto + verso de CNI scannés ensemble sur une A4), crope chaque zone et la fait OCRiser séparément. Le résultat segmenté n'est retenu que s'il extrait strictement plus de champs que la première passe.
 
 vllm-mlx tourne dans une VM macOS dans le cluster. Le host Mac s'enregistre comme node `darwin/arm64` via [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet), Kubernetes ordonnance dessus le pod `macos`, le virtual-kubelet pull l'image OCI de la VM depuis le registry k3d et la démarre via `Virtualization.framework`. Dans la VM, un `LaunchDaemon` lance et supervise `vllm-mlx`. Les pods docverify l'atteignent via le Service Kubernetes `vllm-mlx:8000`.
@@ -39,7 +41,7 @@ vllm-mlx tourne dans une VM macOS dans le cluster. Le host Mac s'enregistre comm
 brew install colima docker docker-compose
 
 # Outils K8s + traitement docs
-brew install k3d kubectl tesseract tesseract-lang poppler imagemagick jq
+brew install k3d kubectl tesseract tesseract-lang poppler imagemagick dmtx-utils jq
 
 # Stack Go + Python
 brew install go uv python@3.13

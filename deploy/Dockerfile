@@ -16,6 +16,7 @@ RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-fra \
     tesseract-ocr-osd \
+    dmtx-utils \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
