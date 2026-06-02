@@ -7,7 +7,7 @@ Tout le « strict nécessaire » pour configurer la VM source et la (re)capturer
 | Fichier | Rôle |
 |---|---|
 | `setup-vm.sh` | Installe vllm-mlx + venv, **pin `transformers==5.5.0`** (sinon vision en charabia), pré-DL Qwen-7B, et bootstrap les deux LaunchDaemons. Idempotent (`reload_daemon` gère un service déjà actif). Refuse de tourner hors user `test`. |
-| `cleanup-vm.sh` | Ménage caches + zero-fill APFS **avant capture** (réduit l'image OCI). Garde `whoami==test` (jamais sur le host). |
+| `cleanup-vm.sh` | Ménage caches + zero-fill APFS **avant capture** (réduit l'image OCI). |
 | `vllm-watchdog.sh` | Supervision : poll d'une **vraie inférence** ; après 3 échecs consécutifs → `launchctl kickstart -k` du serveur. Couvre le GPU hang Metal que K8s ne voit pas. |
 | `com.orbinea.vllm-mlx.plist` | LaunchDaemon serveur vllm-mlx (user `test`, KeepAlive). |
 | `com.orbinea.vllm-watchdog.plist` | LaunchDaemon watchdog (root, `StartInterval 30s`). |
@@ -51,5 +51,3 @@ ssh -t test@192.168.20.10 'sudo shutdown -h now'
 # 7. Déployer : bumper l'image dans deploy/k8s/macos.yaml, puis
 kubectl apply -f deploy/k8s/macos.yaml
 ```
-
-Détails et pièges : `docs/setup/macos-vz.md`, `docs/macos-vm-setup-guide.md`, `docs/setup/supervision.md`.
