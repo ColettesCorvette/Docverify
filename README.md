@@ -113,29 +113,14 @@ curl -s http://localhost:5000/v2/ && echo "registry OK"
 
 ## Push de l'image VM dans le registry
 
-**Recommandé : `scripts/recapture-vm.sh`** automatise toute la recapture (bump auto du tag, purge du registry, push, patch du manifeste, redeploy) avec garde-fous :
+`scripts/recapture-vm.sh` automatise la recapture de bout en bout (bump auto du tag depuis `deploy/k8s/macos.yaml`, purge du registry, `oras push --plain-http`, patch du manifeste, redeploy) avec garde-fous :
 
 ```bash
 ./scripts/recapture-vm.sh              # recapture complète depuis la VM source
 ./scripts/recapture-vm.sh --push-only  # reprise : VM déjà arrêtée et nettoyée
 ```
 
-Procédure manuelle équivalente (référence) — **VM arrêtée obligatoire** sinon corruption du `disk.img` pendant le calcul des digests.
-
-```bash
-HW_MODEL=$(jq -r .hardwareModel ~/vm.json)
-MACHINE_ID=$(jq -r .machineId ~/vm.json)
-
-~/oras-macos-vz/bin/darwin/arm64/oras push \
-  --plain-http \
-  --disk-path ~/disk.img \
-  --aux-path ~/aux.img \
-  --hardware-model "$HW_MODEL" \
-  --machine-id "$MACHINE_ID" \
-  localhost:5000/macos-vm:26.8
-```
-
-Le `--plain-http` est crucial (registry HTTP, pas TLS). Push de 5-15 min pour un disque de 100 Go (compression ~30-50 Go).
+**VM arrêtée obligatoire** avant le push, sinon corruption du `disk.img` pendant le calcul des digests. Compter 5-15 min pour un disque de 100 Go (compression ~30-50 Go).
 
 ## Lancer le virtual-kubelet
 
@@ -183,40 +168,18 @@ Deux manifests :
 
 Le pod `macos` enchaîne `Pending → Downloading → ContainerCreating → Running` en 5-15 min selon le pull de l'image OCI.
 
-Vérification :
-
-```bash
-kubectl get pods,svc,deploy
-kubectl rollout status deployment/docverify
-curl http://localhost:8680/health
-```
+Ensuite, à chaque modif du code Go, `./scripts/redeploy.sh` rebâtit l'image, la réimporte dans k3d et fait le `rollout restart` + health check en une commande.
 
 ## Tests
 
 ```bash
-# Santé
-curl http://localhost:8680/health
-
-# Suite complète sur tous les samples
-./scripts/test-api.sh all
-
-# Un seul sample
-./scripts/test-api.sh edf
-./scripts/test-api.sh freepro
-./scripts/test-api.sh cni8493
+curl http://localhost:8680/health     # santé
+./scripts/test-api.sh all             # tous les samples
+./scripts/test-api.sh edf             # un seul sample
+./scripts/concurrency-test.sh         # charge : rafales parallèles + détection de fuites entre requêtes
 ```
 
-Test du parallélisme côté queue, 8 samples en parallèle dans 8 fichiers de log distincts :
-
-```fish
-mkdir -p /tmp/docverify-test
-for fn in edf freepro sfr lucie cni8493 cni8498 justif-jpg justif-pdf
-  ./scripts/test-api.sh $fn > /tmp/docverify-test/$fn.log 2>&1 &
-end
-wait
-```
-
-Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un slot se libère.
+Bench multi-modèles et scoring de justesse : `scripts/bench-models.sh` puis `scripts/score-bench.sh`.
 
 ## Architecture
 
@@ -249,7 +212,7 @@ Les 5 premiers workers traitent en parallèle, les 3 suivants attendent qu'un sl
 │      ▲ k3d bridge                                                   │
 │      │                                                              │
 │  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ VM macOS clonée à partir de macos-vm:26.5                     │   │
+│  │ VM macOS clonée à partir de macos-vm:<version>                │   │
 │  │   user "test"                                                  │   │
 │  │   /Library/LaunchDaemons/com.orbinea.vllm-mlx.plist             │   │
 │  │   vllm-mlx :8000 (Qwen2.5-VL-7B, MLX)                          │   │
