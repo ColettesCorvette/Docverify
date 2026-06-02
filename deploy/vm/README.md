@@ -12,7 +12,7 @@ Tout le « strict nécessaire » pour configurer la VM source et la (re)capturer
 | `com.orbinea.vllm-mlx.plist` | LaunchDaemon serveur vllm-mlx (user `test`, KeepAlive). |
 | `com.orbinea.vllm-watchdog.plist` | LaunchDaemon watchdog (root, `StartInterval 30s`). |
 
-> Le LaunchAgent **host** `com.orbinea.macos-vz-kubelet.plist` reste dans `deploy/launchd/` : il pilote le virtual-kubelet sur le Mac, ce n'est pas du provisioning *dans* la VM.
+> Le LaunchAgent **host** `com.orbinea.macos-vz-kubelet.plist` reste dans `deploy/launchd/` : il pilote le virtual-kubelet sur le Mac, ce n'est pas du provisioning **dans** la VM.
 
 ## Artefacts host (hors repo)
 
