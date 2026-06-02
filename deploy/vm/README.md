@@ -6,7 +6,7 @@ Tout le « strict nécessaire » pour configurer la VM source et la (re)capturer
 
 | Fichier | Rôle |
 |---|---|
-| `setup-vm.sh` | Installe vllm-mlx + venv, **pin `transformers==5.5.0`** (sinon vision en charabia), pré-DL Qwen-7B, et bootstrap les deux LaunchDaemons. Idempotent (`reload_daemon` gère un service déjà actif). Refuse de tourner hors user `test`. |
+| `setup-vm.sh` | Installe vllm-mlx + venv, **pin `transformers==5.5.0`** (sinon vision en charabia), pré-DL Qwen-7B, et bootstrap les deux LaunchDaemons. Idempotent (`reload_daemon` gère un service déjà actif). Refuse de tourner hors user `test` pour l'instant. |
 | `cleanup-vm.sh` | Ménage caches + zero-fill APFS **avant capture** (réduit l'image OCI). |
 | `vllm-watchdog.sh` | Supervision : poll d'une **vraie inférence** ; après 3 échecs consécutifs → `launchctl kickstart -k` du serveur. Couvre le GPU hang Metal que K8s ne voit pas. |
 | `com.orbinea.vllm-mlx.plist` | LaunchDaemon serveur vllm-mlx (user `test`, KeepAlive). |
