@@ -6,7 +6,7 @@
 #
 # Usage :
 #   MODEL=mlx-community/Qwen2.5-VL-7B-Instruct-4bit ./scripts/bench-models.sh > /tmp/bench-qwen7.jsonl
-#   MODEL=mlx-community/gemma-4-e4b-it-4bit          ./scripts/bench-models.sh > /tmp/bench-gemma4.jsonl
+#   
 #
 # Comparer ensuite :
 #   jq -s 'group_by(.sample) | map({sample: .[0].sample, latencies: [.[].elapsed_s]})' /tmp/bench-*.jsonl
