@@ -83,8 +83,8 @@ Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis la VM macO
 | Page | Contenu |
 |---|---|
 | [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP) | Route, champs multipart, réponses, mode webhook, codes d'erreur |
-| [Préparation image VM](https://git.int.orbinea.example/tfuchs/docverify/wiki/Préparation-image-VM) | Création de la VM macOS, installation de vllm-mlx, push OCI |
-| [Déploiement macOS-vz](https://git.int.orbinea.example/tfuchs/docverify/wiki/Déploiement-macOS-vz) | virtual-kubelet, certs TLS, mise en service du backend |
+| [Préparation image VM](https://git.int.orbinea.example/tfuchs/docverify/wiki/Preparation-image-VM) | Création de la VM macOS, installation de vllm-mlx, push OCI |
+| [Déploiement macOS-vz](https://git.int.orbinea.example/tfuchs/docverify/wiki/Deploiement-macOS-vz) | virtual-kubelet, certs TLS, mise en service du backend |
 | [Supervision vllm-mlx](https://git.int.orbinea.example/tfuchs/docverify/wiki/Supervision-vllm-mlx) | LaunchDaemon et watchdog à l'intérieur de la VM |
 | [Commandes utiles](https://git.int.orbinea.example/tfuchs/docverify/wiki/Commandes-utiles) | Logs, shell dans un pod, scale, recapture |
 | [Dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) | Dashboard Kubernetes, installation et accès |
