@@ -6,9 +6,9 @@
 #   MODEL — override du modèle LLM (défaut : Qwen2.5-VL-7B-Instruct-4bit)
 #   API   — override de l'URL docverify (défaut : http://localhost:8680)
 #
-# Cible la route principale POST /api/v1/supporting-documents.
-# Les routes legacy /check et /batch sont commentées dans server.go ;
-# pour les réactiver, décommenter les lignes mux.HandleFunc correspondantes.
+# Chaque appel synchrone affiche l'en-tête X-Request-Id renvoyé par le serveur,
+# puis le verdict JSON, pour qu'on visualise l'identifiant de chaque requête. Le
+# cas async montre en plus le mode webhook : 202 + job_id via callback_url.
 
 set -e
 
@@ -17,7 +17,6 @@ ROUTE="/api/v1/supporting-documents"
 SAMPLES="/Users/dev/Desktop/LLM/ocr/samples"
 MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 
-# Couleurs
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 NC='\033[0m'
@@ -29,117 +28,79 @@ separator() {
     echo -e "${BLUE}═══════════════════════════════════════════════════════════${NC}"
 }
 
-# --- /health -------------------------------------------------------------
+# post_doc envoie un document en POST synchrone, affiche l'en-tête X-Request-Id
+# puis le verdict JSON. Tous les champs multipart sont passés en arguments.
+post_doc() {
+    local headers
+    headers="$(mktemp)"
+    local body
+    body="$(curl -s -D "$headers" -X POST "$API$ROUTE" "$@")"
+    grep -i '^X-Request-Id:' "$headers" | tr -d '\r'
+    rm -f "$headers"
+    echo "$body" | jq
+}
 
 test_health() {
     separator "GET /health"
     curl -s "$API/health" | jq
 }
 
-# --- POST /api/v1/supporting-documents sur chaque sample ----------------
-
 test_check_facture_edf() {
-    separator "POST $ROUTE — Facture EDF (DUPONT, 31520)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/facture-EDF.jpg" \
-        -F "name=DUPONT" \
-        -F "postal_code=31520" \
-        -F "model=$MODEL" | jq
+    separator "Facture EDF — DUPONT, 31520"
+    post_doc -F "doc=@$SAMPLES/facture-EDF.jpg" -F "name=DUPONT" -F "postal_code=31520" -F "model=$MODEL"
 }
 
 test_check_facture_freepro() {
-    separator "POST $ROUTE — Facture FreePro (ORBINEA, 99000)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/Facture_FreePro_F202603049358_20260301.pdf" \
-        -F "name=ORBINEA" \
-        -F "postal_code=99000" \
-        -F "model=$MODEL" | jq
+    separator "Facture FreePro — ORBINEA, 99000"
+    post_doc -F "doc=@$SAMPLES/Facture_FreePro_F202603049358_20260301.pdf" -F "name=ORBINEA" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_facture_sfr() {
-    separator "POST $ROUTE — Facture SFR (ORBINEA, 99000)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/sfr-facture-1.pdf" \
-        -F "name=ORBINEA" \
-        -F "postal_code=99000" \
-        -F "model=$MODEL" | jq
+    separator "Facture SFR — ORBINEA, 99000"
+    post_doc -F "doc=@$SAMPLES/sfr-facture-1.pdf" -F "name=ORBINEA" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_cni_lucie() {
-    separator "POST $ROUTE — CNI Lucie (DELAUNAY)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/carte_identite_Lucie.jpg" \
-        -F "name=DELAUNAY" \
-        -F "surname=LUCIE" \
-        -F "model=$MODEL" | jq
+    separator "CNI Lucie — DELAUNAY LUCIE"
+    post_doc -F "doc=@$SAMPLES/carte_identite_Lucie.jpg" -F "name=DELAUNAY" -F "surname=LUCIE" -F "model=$MODEL"
 }
 
 test_check_cni_8493() {
-    separator "POST $ROUTE — CNI index_8493 (BEN AMAR)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/index_8493_1_1200.png" \
-        -F "name=BEN AMAR" \
-        -F "model=$MODEL" | jq
+    separator "CNI index_8493 — BEN AMAR"
+    post_doc -F "doc=@$SAMPLES/index_8493_1_1200.png" -F "name=BEN AMAR" -F "model=$MODEL"
 }
 
 test_check_cni_8498() {
-    separator "POST $ROUTE — CNI index_8498 (DELAUNAY CAMILLE)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/index_8498_1_1200.png" \
-        -F "name=DELAUNAY" \
-        -F "surname=CAMILLE" \
-        -F "model=$MODEL" | jq
+    separator "CNI index_8498 — DELAUNAY CAMILLE"
+    post_doc -F "doc=@$SAMPLES/index_8498_1_1200.png" -F "name=DELAUNAY" -F "surname=CAMILLE" -F "model=$MODEL"
 }
 
 test_check_justif_jpg() {
-    separator "POST $ROUTE — justifs.jpg (LEROY PIERRE, 17999)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/justifs.jpg" \
-        -F "name=LEROY" \
-        -F "surname=PIERRE" \
-        -F "postal_code=17999" \
-        -F "model=$MODEL" | jq
+    separator "justifs.jpg — LEROY PIERRE, 17999"
+    post_doc -F "doc=@$SAMPLES/justifs.jpg" -F "name=LEROY" -F "surname=PIERRE" -F "postal_code=17999" -F "model=$MODEL"
 }
 
 test_check_justif_pdf() {
-    separator "POST $ROUTE — justif2.pdf"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/justif2.pdf" \
-        -F "name=ORBINEA" \
-        -F "postal_code=99000" \
-        -F "model=$MODEL" | jq
+    separator "justif2.pdf — ORBINEA, 99000"
+    post_doc -F "doc=@$SAMPLES/justif2.pdf" -F "name=ORBINEA" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_cni_solange() {
-    separator "POST $ROUTE — CNI Solange (DURAND SOLANGE)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/carte_identite_Solange.png" \
-        -F "name=DURAND" \
-        -F "surname=SOLANGE" \
-        -F "model=$MODEL" | jq
+    separator "CNI Solange — DURAND SOLANGE"
+    post_doc -F "doc=@$SAMPLES/carte_identite_Solange.png" -F "name=DURAND" -F "surname=SOLANGE" -F "model=$MODEL"
 }
 
 test_check_impot() {
-    separator "POST $ROUTE — impot_exemple.pdf (DURAND SOLANGE, 99000)"
-    curl -s -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/impot_exemple.pdf" \
-        -F "name=DURAND" \
-        -F "surname=SOLANGE" \
-        -F "postal_code=99000" \
-        -F "model=$MODEL" | jq
+    separator "impot_exemple.pdf — DURAND SOLANGE, 99000"
+    post_doc -F "doc=@$SAMPLES/impot_exemple.pdf" -F "name=DURAND" -F "surname=SOLANGE" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_async() {
-    separator "POST $ROUTE — webhook async + X-Request-Id"
-    echo "→ Sync : on récupère l'en-tête X-Request-Id"
-    curl -s -i -X POST "$API$ROUTE" \
-        -F "doc=@$SAMPLES/justifs.jpg" \
-        -F "name=LEROY" \
-        -F "surname=PIERRE" \
-        -F "postal_code=17999" \
-        -F "model=$MODEL" | grep -i '^X-Request-Id:'
+    separator "Webhook asynchrone + X-Request-Id"
+    echo "→ Sync : verdict précédé de son en-tête X-Request-Id"
+    post_doc -F "doc=@$SAMPLES/justifs.jpg" -F "name=LEROY" -F "surname=PIERRE" -F "postal_code=17999" -F "model=$MODEL"
     echo ""
-    echo "→ Async : callback_url → 202 + job_id ; lance scripts/callback-listener.py pour voir le verdict livré"
+    echo "→ Async : callback_url renvoie 202 + job_id ; lance scripts/callback-listener.py pour voir le verdict livré"
     curl -s -X POST "$API$ROUTE" \
         -F "doc=@$SAMPLES/justifs.jpg" \
         -F "name=LEROY" \
