@@ -6,11 +6,10 @@
 # pages déjà en ligne (les pages live ont des accents — « Déploiement… » — que
 # les fichiers locaux n'ont pas), puis commit + push.
 #
-# Auth SSH interactive : ta passphrase sera demandée (l'agent doit avoir la clé,
-# sinon `ssh-add ~/.ssh/id_ed25519` d'abord).
+# Auth SSH interactive : La passphrase sera demandée 
 #
 # Usage : ./scripts/push-wiki.sh ["message de commit"]
-# Env   : WIKI_REMOTE, WIKI_DIR (défaut ~/docverify-wiki)
+
 
 set -euo pipefail
 
