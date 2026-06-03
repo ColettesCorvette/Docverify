@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # recapture-vm.sh — recapture l'image OCI de la VM vllm-mlx avec BUMP AUTO du tag.
 #
-# Orchestre la procédure validée (deploy/vm/README.md) de bout en bout depuis le
+# Orchestre la procédure (deploy/vm/README.md) de bout en bout depuis le
 # HOST, en réutilisant setup-vm.sh / cleanup-vm.sh DANS la VM. Le tag est lu dans
-# le manifeste puis incrémenté automatiquement (26.7 -> 26.8) : plus besoin
+# le manifeste puis incrémenté automatiquement (26.X -> 26.X) : plus besoin
 # d'éditer le YAML à la main, et on garde la traçabilité + le rollback par version.
 #
 # Flux : delete ds -> boot VM source -> scp+setup -> vérif -> cleanup -> shutdown
@@ -15,12 +15,8 @@
 #   --push-only : reprend directement à l'étape 6 (purge+push+deploy), pour une VM
 #                 déjà arrêtée et nettoyée (reprise après échec sans re-booter).
 #
-# Env (défauts) : VM_IP(192.168.20.10) VM_USER(test) VM_DIR(~/docverify-vm)
-#   ORAS(~/oras-macos-vz/bin/darwin/arm64/oras) REGISTRY(localhost:5000)
-#   IMAGE_REPO(macos-vm) MANIFEST(deploy/k8s/macos.yaml)
-#
 # Prérequis : colima+k3d up ; ~/docverify-vm/{disk.img,aux.img,vm.json,macosvm} ;
-#   binaire oras ; SSH activé dans la VM (user test). Le SSH est multiplexé :
+#   binaire oras ; SSH activé dans la VM. Le SSH est multiplexé :
 #   le mot de passe n'est demandé QU'UNE fois.
 
 set -euo pipefail
