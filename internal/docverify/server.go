@@ -32,7 +32,7 @@ func DefaultLLMURL() string {
 
 // StartServer démarre le serveur HTTP docverify sur :8680.
 //
-// Utilise le ServeMux Go 1.22 (patterns "METHOD /path/{var}").
+// Utilise le ServeMux et ses patterns méthode "METHOD /path/{var}", introduits en Go 1.22.
 // V1 sans AuthMiddleware ni RBAC : docverify est un service interne
 // appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
 func StartServer() {
