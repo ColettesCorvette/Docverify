@@ -88,9 +88,12 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 //   - postal_code  : code postal attendu (idem)
 //   - model        : override du modèle LLM (optionnel)
 //   - llm_url      : override de l'endpoint LLM (optionnel)
+//   - callback_url : active le mode asynchrone (optionnel) — voir ci-dessous
 //
-// makeSupportingDocumentHandler renvoie un handler qui dépose chaque requête
-// dans la queue in-process et attend le verdict d'un worker.
+// Par défaut (pas de callback_url), le handler dépose la requête dans la queue
+// in-process et attend le verdict d'un worker (synchrone). Si callback_url est
+// fourni, le handler répond immédiatement 202 + job_id et le verdict est POSTé
+// à cette URL en fin de traitement (asynchrone par webhook).
 func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxUploadBytes)
@@ -143,6 +146,26 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 			LLMURL: llmURL,
 		}
 
+		jobID := newRequestID()
+
+		// Mode asynchrone : si le client fournit un callback_url, on accepte tout
+		// de suite (202 + job_id) et le verdict lui est POSTé en fin de traitement.
+		// Le POST synchrone reste le défaut quand callback_url est absent.
+		if callbackURL := r.FormValue("callback_url"); callbackURL != "" {
+			if !validCallbackURL(callbackURL) {
+				os.Remove(destinationPath)
+				writeJSONError(w, http.StatusBadRequest, "callback_url invalide (http/https attendu)")
+				return
+			}
+			go processAsync(q, job, jobID, callbackURL)
+			log.Printf("[async %s] accepté — callback vers %s", jobID, callbackURL)
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusAccepted)
+			json.NewEncoder(w).Encode(map[string]string{"job_id": jobID, "status": "queued"})
+			return
+		}
+
+		w.Header().Set("X-Request-Id", jobID)
 		res := q.Submit(r.Context(), job)
 		if res.Err != nil {
 			handlePipelineError(w, res.Err)
