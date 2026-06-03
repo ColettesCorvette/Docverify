@@ -1,254 +1,94 @@
 # docverify
 
-![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-k3d-326CE5?logo=kubernetes&logoColor=white)
 ![macOS](https://img.shields.io/badge/macOS-launchd-000000?logo=apple&logoColor=white)
 
-`docverify` est un service Go d'analyse automatisée de justificatifs administratifs (factures, CNI, passeports, justificatifs de domicile) via OCR + LLM multimodal, déployé sur Kubernetes et destiné à être intégré au back-office Regia.
+`docverify` est un service Go qui décide si un justificatif administratif est valide : factures, cartes d'identité, passeports, justificatifs de domicile. Il combine de l'OCR et un LLM multimodal, tourne sur Kubernetes, et il est appelé par le back-office Regia, qui lui transmet un document accompagné de l'identité et de l'adresse attendues.
 
-Documentation disponible sur le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home).
+La documentation détaillée vit dans le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home). Ce README donne la vue d'ensemble et le strict nécessaire pour développer en local.
 
 ## Comment ça marche
 
-Regia envoie le document en POST sur l'API. Le handler dépose le job dans une queue in-process Go : un channel bufferisé alimenté par les requêtes HTTP et consommé par un pool de workers. Chaque worker exécute le pipeline OCR + analyse : extraction par `pdftotext` ou Tesseract sur les documents simples, fallback vers un LLM multimodal (Qwen2.5-VL-7B servi par vllm-mlx) pour les images et fonds complexes.
+Regia envoie le document en POST sur l'API. Le serveur le dépose dans une queue interne, un pool de workers le traite, puis le fichier temporaire est supprimé et le verdict est renvoyé. La queue vit dans le processus de chaque pod : un simple channel Go alimenté par les requêtes et consommé par les workers. Elle borne ainsi le nombre d'appels simultanés au LLM sans dépendre d'un Redis.
 
-En amont de l'OCR, le pipeline tente de lire un cachet **2D-DOC** (le Datamatrix signé apposé sur les justificatifs de domicile français) via `dmtxread` : s'il est présent, l'identité, l'adresse et la date d'émission sont extraites directement des données signées et tout le pipeline OCR/LLM est court-circuité — fiable et quasi instantané, ce qui décharge d'autant vllm-mlx.
+Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si le document porte un cachet 2D-DOC, le Datamatrix signé des justificatifs de domicile français, docverify le lit directement et court-circuite tout le reste : l'identité, l'adresse et la date sortent des données signées, sans OCR ni LLM. Sinon le texte est extrait par `pdftotext` pour un PDF natif, ou par Tesseract pour une image à fond simple. Quand cette extraction est trop pauvre, ou que le fond est complexe comme sur un passeport, docverify bascule sur le LLM multimodal. En dernier recours, si la page semble contenir plusieurs documents, par exemple un recto et un verso de carte d'identité scannés ensemble, elle est découpée en zones traitées séparément. À chaque étape, un nouveau résultat n'est conservé que s'il extrait plus d'informations que le précédent.
 
-Si la première passe d'analyse renvoie un score d'information faible ou un verdict `unreadable`, le pipeline tente un second passage par segmentation : ImageMagick détecte les zones de contenu rectangulaires distinctes sur la page (typique d'un recto + verso de CNI scannés ensemble sur une A4), crope chaque zone et la fait OCRiser séparément. Le résultat segmenté n'est retenu que s'il extrait strictement plus de champs que la première passe.
-
-vllm-mlx tourne dans une VM macOS dans le cluster. Le host Mac s'enregistre comme node `darwin/arm64` via [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet), Kubernetes ordonnance dessus le pod `macos`, le virtual-kubelet pull l'image OCI de la VM depuis le registry k3d et la démarre via `Virtualization.framework`. Dans la VM, un `LaunchDaemon` lance et supervise `vllm-mlx`. Les pods docverify l'atteignent via le Service Kubernetes `vllm-mlx:8000`.
-
-## Projets externes utilisés
-
-| Projet | URL | Rôle |
-|---|---|---|
-| `agoda-com/macOS-vz-kubelet` | https://github.com/agoda-com/macOS-vz-kubelet | Virtual Kubelet provider qui pilote `Virtualization.framework` pour démarrer des VMs macOS comme pods |
-| `agoda-com/oras-macos-vz` | https://github.com/agoda-com/oras-macos-vz | Fork d'ORAS qui packe les images VM (disk + aux + hardware-model + machine-id) au format OCI compatible |
-| `s-u/macosvm` | https://github.com/s-u/macosvm | Wrapper `Virtualization.framework` pour créer et booter la VM source pendant la préparation de l'image |
-| `waybarrios/vllm-mlx` | https://github.com/waybarrios/vllm-mlx | Serveur compatible OpenAI sur stack MLX (Apple Silicon), installé dans la VM avant capture |
-| `mlx-community/Qwen2.5-VL-7B-Instruct-4bit` | https://huggingface.co/mlx-community/Qwen2.5-VL-7B-Instruct-4bit | Modèle vision-language par défaut servi par vllm-mlx. Variante 32B disponible mais plus lente et moins juste sur nos samples — voir `docs/rapports/benchmarks-20260526.md`. |
-| `virtual-kubelet/virtual-kubelet` | https://github.com/virtual-kubelet/virtual-kubelet | Library Kubernetes sous-jacente à `macOS-vz-kubelet` |
-
-## Machines
-
-- **Production / dev actuel** : 1x Mac Mini M4 Pro (ARM64, 12 CPU, 48 Go RAM unifiée)
-- **Cibles futures** : 3 machines en attente d'attribution
-
-## Prérequis
-
-```bash
-# Runtime Docker
-brew install colima docker docker-compose
-
-# Outils K8s + traitement docs
-brew install k3d kubectl tesseract tesseract-lang poppler imagemagick dmtx-utils jq
-
-# Stack Go + Python
-brew install go uv python@3.13
-
-# Repos macOS-vz à cloner à côté de docverify
-git clone https://github.com/agoda-com/macOS-vz-kubelet ~/macos-vz-kubelet
-git clone https://github.com/agoda-com/oras-macos-vz ~/oras-macos-vz
-```
-
-## Préparer la VM macOS source
-
-C'est l'étape la plus longue (création d'image, install vllm-mlx, télécharger Qwen). Procédure détaillée sur le wiki : [Préparation image VM](https://git.int.orbinea.example/tfuchs/docverify/wiki/Préparation-image-VM). À la fin :
-
-- `~/disk.img` + `~/aux.img` + `~/vm.json` (avec `hardwareModel` et `machineId` base64)
-- Dans la VM (user `test`) : `vllm-mlx` installé, modèle Qwen pré-téléchargé, plist en `LaunchDaemon` dans `/Library/LaunchDaemons/`, SSH activé.
-
-Deux scripts versionnés automatisent la majorité du setup :
-
-```bash
-# Setup vllm-mlx + LaunchDaemon dans une VM fraîche (boot manuel obligatoire avant)
-scp deploy/vm/setup-vm.sh deploy/vm/com.orbinea.vllm-mlx.plist test@<vm-ip>:~/
-ssh test@<vm-ip> 'bash ~/setup-vm.sh'
-
-# Ménage caches + zero-fill APFS juste avant capture OCI (gain ~10-20% sur compression)
-ssh test@<vm-ip> 'bash -s' < deploy/vm/cleanup-vm.sh
-ssh test@<vm-ip> 'sudo shutdown -h now'
-```
-
-## Build des outils macOS-vz
-
-```bash
-cd ~/macos-vz-kubelet
-mkdir -p bin
-go build -o bin/macos-vz-kubelet ./cmd/virtual-kubelet
-codesign --entitlements resources/vz.entitlements -s - bin/macos-vz-kubelet
-# binaire oras-macos-vz : déjà fourni dans bin/darwin/arm64/oras du repo
-```
-
-## Build de l'image docverify
-
-```bash
-cd docverify
-docker build -f deploy/Dockerfile -t docverify-docverify:latest .
-```
-
-## Cluster k3d avec registry OCI
-
-```bash
-k3d cluster create mini-cluster \
-  --api-port 6443 \
-  -p "8680:8680@loadbalancer" \
-  -p "8001:8001@loadbalancer" \
-  --registry-create k3d-registry:0.0.0.0:5000
-
-k3d image import docverify-docverify:latest -c mini-cluster
-```
-
-Le `--registry-create` ajoute un registre OCI accessible sur `localhost:5000` côté host et `k3d-registry:5000` intra-cluster — indispensable pour pousser l'image VM via `oras-macos-vz`.
-
-Le flag `--api-port 6443` fixe le port du serveur API K8s. Sans lui, Docker attribue un port aléatoire à chaque démarrage et le kubeconfig devient invalide.
-
-Vérification :
-
-```bash
-k3d cluster list
-kubectl get nodes
-curl -s http://localhost:5000/v2/ && echo "registry OK"
-```
-
-## Push de l'image VM dans le registry
-
-`scripts/recapture-vm.sh` automatise la recapture de bout en bout (bump auto du tag depuis `deploy/k8s/macos.yaml`, purge du registry, `oras push --plain-http`, patch du manifeste, redeploy) avec garde-fous :
-
-```bash
-./scripts/recapture-vm.sh              # recapture complète depuis la VM source
-./scripts/recapture-vm.sh --push-only  # reprise : VM déjà arrêtée et nettoyée
-```
-
-**VM arrêtée obligatoire** avant le push, sinon corruption du `disk.img` pendant le calcul des digests. Compter 5-15 min pour un disque de 100 Go (compression ~30-50 Go).
-
-## Lancer le virtual-kubelet
-
-Extraction des certs TLS pour le virtual-kubelet (à refaire à chaque recréation du cluster) :
-
-```bash
-mkdir -p ~/.kube/k3d-tls
-kubectl config view --raw --minify -o json | jq -r '.users[0].user["client-certificate-data"]' | base64 -d > ~/.kube/k3d-tls/tls.crt
-kubectl config view --raw --minify -o json | jq -r '.users[0].user["client-key-data"]' | base64 -d > ~/.kube/k3d-tls/tls.key
-kubectl config view --raw --minify -o json | jq -r '.clusters[0].cluster["certificate-authority-data"]' | base64 -d > ~/.kube/k3d-tls/ca.crt
-chmod 600 ~/.kube/k3d-tls/tls.key
-```
-
-Lancement en foreground pour le debug. Pour pérenniser, déposer le plist `deploy/launchd/com.orbinea.macos-vz-kubelet.plist` dans `~/Library/LaunchAgents/` après avoir renseigné le `VZ_SSH_PASSWORD` ; le LaunchAgent prend alors le relais au login :
-
-```bash
-export APISERVER_CERT_LOCATION=$HOME/.kube/k3d-tls/tls.crt
-export APISERVER_KEY_LOCATION=$HOME/.kube/k3d-tls/tls.key
-export APISERVER_CA_CERT_LOCATION=$HOME/.kube/k3d-tls/ca.crt
-export KUBECONFIG=$HOME/.kube/config
-export DOCKER_HOST=unix:///Users/$USER/.colima/default/docker.sock
-export VZ_SSH_USER=test
-export VZ_SSH_PASSWORD=<mdp du user test dans la VM>
-
-~/macos-vz-kubelet/bin/macos-vz-kubelet \
-  --nodename macos-vz-mini \
-  --provider-id "provider://$(uuidgen)" \
-  --log-level debug
-```
-
-`kubectl get nodes` doit maintenant lister `macos-vz-mini` en plus du node Linux.
-
-## Déployer dans le cluster
-
-```bash
-kubectl apply -f deploy/k8s/docverify-deployment.yaml
-kubectl apply -f deploy/k8s/macos.yaml
-kubectl get pods -w
-```
-
-Deux manifests :
-
-- `docverify-deployment.yaml` : Deployment 2 replicas + Service LoadBalancer :8680. `LLM_URL = http://vllm-mlx:8000` (DNS interne du Service K8s).
-- `macos.yaml` : Pod unique sur le node `macos-vz-mini` (toleration `virtual-kubelet.io/provider=macos-vz`, nodeSelector `kubernetes.io/os=darwin`) + Service ClusterIP `vllm-mlx:8000`.
-
-Le pod `macos` enchaîne `Pending → Downloading → ContainerCreating → Running` en 5-15 min selon le pull de l'image OCI.
-
-Ensuite, à chaque modif du code Go, `./scripts/redeploy.sh` rebâtit l'image, la réimporte dans k3d et fait le `rollout restart` + health check en une commande.
-
-## Tests
-
-```bash
-curl http://localhost:8680/health     # santé
-./scripts/test-api.sh all             # tous les samples
-./scripts/test-api.sh edf             # un seul sample
-./scripts/concurrency-test.sh         # charge : rafales parallèles + détection de fuites entre requêtes
-```
-
-Bench multi-modèles et scoring de justesse : `scripts/bench-models.sh` puis `scripts/score-bench.sh`.
+Le LLM est `vllm-mlx`, qui sert le modèle `Qwen2.5-VL-7B-Instruct-4bit`. Il ne tourne pas à côté du service mais dans une VM macOS pilotée par Kubernetes. Le Mac s'enregistre dans le cluster comme un node `darwin/arm64` grâce à [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet), Kubernetes y démarre la VM à partir d'une image OCI, et un service interne `vllm-mlx` l'expose aux pods docverify. Côté code, docverify ne connaît qu'une URL OpenAI-compatible : on peut donc remplacer le backend macOS par un backend Linux à GPU sans toucher au service.
 
 ## Architecture
 
 ```
-┌──────────────────────────── Host Mac ──────────────────────────────┐
+┌─────────────────────────── Host Mac ───────────────────────────────┐
+│  macos-vz-kubelet  →  enregistre le node virtuel "macos-vz-mini"    │
 │                                                                     │
-│  macos-vz-kubelet (binaire codesigné)                               │
-│      │ enregistre node virtuel "macos-vz-mini" (darwin/arm64)       │
-│      │ pull image OCI depuis k3d-registry                           │
-│      │ démarre VM via Virtualization.framework                      │
-│      ▼                                                              │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │  Colima VM (k3d bridge)                                       │   │
-│  │  ┌──── k3d cluster mini-cluster ─────────────────────────┐   │   │
-│  │  │  serverlb                                              │   │   │
-│  │  │    :8680 → Service docverify (LoadBalancer)             │   │   │
-│  │  │    :8001 → Service kubernetes-dashboard-lb             │   │   │
-│  │  │                                                        │   │   │
-│  │  │  k3d-registry (registre OCI :5000)                     │   │   │
-│  │  │                                                        │   │   │
-│  │  │  k3d-mini-cluster-server-0  (Linux)                    │   │   │
-│  │  │    ├ docverify-pod-1  ──┐                               │   │   │
-│  │  │    ├ docverify-pod-2  ──┼─→ Service vllm-mlx :8000      │   │   │
-│  │  │    └ kubernetes-dashboard                              │   │   │
-│  │  │                          │                              │   │   │
-│  │  │  macos-vz-mini  (Darwin, virtuel)                      │   │   │
-│  │  │    └ pod "macos"  ◄──────┘                              │   │   │
-│  │  └──────────────────────────────────────────────────────┘   │   │
-│  └──────────────────────────────────────────────────────────────┘   │
-│      ▲ k3d bridge                                                   │
-│      │                                                              │
-│  ┌──────────────────────────────────────────────────────────────┐   │
-│  │ VM macOS clonée à partir de macos-vm:<version>                │   │
-│  │   user "test"                                                  │   │
-│  │   /Library/LaunchDaemons/com.orbinea.vllm-mlx.plist             │   │
-│  │   vllm-mlx :8000 (Qwen2.5-VL-7B, MLX)                          │   │
-│  │   restart auto sur crash, logs /Users/test/Library/Logs/...   │   │
-│  └──────────────────────────────────────────────────────────────┘   │
+│  Colima → k3d "mini-cluster"                                        │
+│    ├─ node Linux                                                    │
+│    │    docverify-pod-1 ┐                                            │
+│    │    docverify-pod-2 ┼──→  Service vllm-mlx:8000                  │
+│    ├─ k3d-registry  OCI :5000                                       │
+│    └─ node Darwin "macos-vz-mini"                                   │
+│         pod vllm-mlx  ◄─┘                                           │
+│              │ Virtualization.framework                             │
+│              ▼                                                      │
+│  VM macOS → vllm-mlx:8000  ·  Qwen2.5-VL-7B MLX  ·  LaunchDaemon    │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-### Stack vllm-mlx dans la VM
+Une requête suit le chemin : Regia → pod docverify → service vllm-mlx → pod sur le Mac → VM → vllm-mlx.
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                           vLLM API Layer                                │
-│                    (OpenAI-compatible interface)                         │
-└─────────────────────────────────────────────────────────────────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                            MLXPlatform                                  │
-│               (vLLM platform plugin for Apple Silicon)                  │
-└─────────────────────────────────────────────────────────────────────────┘
-                                   │
-        ┌─────────────┬────────────┴────────────┬─────────────┐
-        ▼             ▼                         ▼             ▼
-┌───────────────┐ ┌───────────────┐ ┌───────────────┐ ┌───────────────┐
-│    mlx-lm     │ │   mlx-vlm     │ │   mlx-audio   │ │mlx-embeddings │
-│ LLM inference│ │ Vision+LLM    │ │  TTS + STT    │ │ Embeddings    │
-└───────────────┘ └───────────────┘ └───────────────┘ └───────────────┘
-        │             │                         │             │
-        └─────────────┴─────────────────────────┴─────────────┘
-                                   │
-                                   ▼
-┌─────────────────────────────────────────────────────────────────────────┐
-│                              MLX                                        │
-│                Apple ML Framework, Metal kernels                         │
-└─────────────────────────────────────────────────────────────────────────┘
+## Briques externes
+
+| Projet | Rôle |
+|---|---|
+| [macOS-vz-kubelet](https://github.com/agoda-com/macOS-vz-kubelet) | Pilote `Virtualization.framework` pour faire tourner des VM macOS comme des pods |
+| [oras-macos-vz](https://github.com/agoda-com/oras-macos-vz) | Empaquette l'image VM au format OCI poussé dans le registry |
+| [macosvm](https://github.com/s-u/macosvm) | Crée et démarre la VM source pendant la préparation de l'image |
+| [vllm-mlx](https://github.com/waybarrios/vllm-mlx) | Serveur OpenAI-compatible sur la stack MLX d'Apple Silicon |
+| [Qwen2.5-VL-7B-Instruct-4bit](https://huggingface.co/mlx-community/Qwen2.5-VL-7B-Instruct-4bit) | Modèle vision-langage servi par défaut |
+
+## Développer et tester en local
+
+docverify est un projet Go pur, sans dépendance Go externe. Il a en revanche besoin de quelques outils système et d'un endpoint LLM joignable.
+
+```bash
+brew install go tesseract tesseract-lang poppler imagemagick dmtx-utils jq
+go build -o docverify ./cmd/docverify
 ```
 
+Le même binaire a trois modes. Sans argument, il démarre le serveur HTTP sur `:8680`, et l'URL du LLM se règle par la variable `LLM_URL`. Avec un fichier ou du JSON en argument, il analyse un document unique et l'affiche en tableau. Si l'entrée contient une liste `individuals`, il bascule en mode batch sur plusieurs personnes.
 
+```bash
+LLM_URL=http://localhost:8000 ./docverify     # serveur HTTP
+./docverify input.json                        # un seul document
+./scripts/test-api.sh all                    # suite de tests sur les samples
+```
+
+La route, ses champs et le mode webhook sont décrits dans le wiki, page [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP).
+
+## Déployer
+
+La mise en place complète, de la préparation de l'image VM jusqu'à la mise en service du backend, est documentée pas à pas dans le wiki. Une fois l'image VM prête et le virtual-kubelet lancé, le déploiement courant tient en deux manifestes et un script.
+
+```bash
+kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et ses replicas
+kubectl apply -f deploy/k8s/macos.yaml                 # backend vllm-mlx, un par Mac via DaemonSet
+./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
+```
+
+Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis la VM macOS, `scripts/gen-llm-backend.sh` détecte le GPU discret et génère le manifeste vLLM correspondant, derrière le même service `vllm-mlx`.
+
+## Documentation
+
+| Page | Contenu |
+|---|---|
+| [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP) | Route, champs multipart, réponses, mode webhook, codes d'erreur |
+| [Préparation image VM](https://git.int.orbinea.example/tfuchs/docverify/wiki/Préparation-image-VM) | Création de la VM macOS, installation de vllm-mlx, push OCI |
+| [Déploiement macOS-vz](https://git.int.orbinea.example/tfuchs/docverify/wiki/Déploiement-macOS-vz) | virtual-kubelet, certs TLS, mise en service du backend |
+| [Supervision vllm-mlx](https://git.int.orbinea.example/tfuchs/docverify/wiki/Supervision-vllm-mlx) | LaunchDaemon et watchdog à l'intérieur de la VM |
+| [Commandes utiles](https://git.int.orbinea.example/tfuchs/docverify/wiki/Commandes-utiles) | Logs, shell dans un pod, scale, recapture |
+| [Dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) | Dashboard Kubernetes, installation et accès |
+
+## Machines
+
+Le développement se fait aujourd'hui sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires arrivent pour répartir la charge du LLM sur plusieurs backends : mêmes M4 Pro 12 cœurs, mais avec 24 Go de mémoire chacun.
