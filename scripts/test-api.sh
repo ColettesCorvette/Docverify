@@ -1,6 +1,6 @@
 #!/bin/bash
 # Script de test de l'API docverify (V1).
-# Usage : ./test-api.sh [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot]
+# Usage : ./test-api.sh [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot|async]
 #
 # Variables d'env :
 #   MODEL — override du modèle LLM (défaut : Qwen2.5-VL-7B-Instruct-4bit)
@@ -129,6 +129,26 @@ test_check_impot() {
         -F "model=$MODEL" | jq
 }
 
+test_check_async() {
+    separator "POST $ROUTE — webhook async + X-Request-Id"
+    echo "→ Sync : on récupère l'en-tête X-Request-Id"
+    curl -s -i -X POST "$API$ROUTE" \
+        -F "doc=@$SAMPLES/justifs.jpg" \
+        -F "name=LEROY" \
+        -F "surname=PIERRE" \
+        -F "postal_code=17999" \
+        -F "model=$MODEL" | grep -i '^X-Request-Id:'
+    echo ""
+    echo "→ Async : callback_url → 202 + job_id ; lance scripts/callback-listener.py pour voir le verdict livré"
+    curl -s -X POST "$API$ROUTE" \
+        -F "doc=@$SAMPLES/justifs.jpg" \
+        -F "name=LEROY" \
+        -F "surname=PIERRE" \
+        -F "postal_code=17999" \
+        -F "callback_url=${CALLBACK_URL:-http://host.docker.internal:9999/cb}" \
+        -F "model=$MODEL" | jq
+}
+
 # --- Dispatcher ---------------------------------------------------------
 
 case "${1:-all}" in
@@ -159,6 +179,7 @@ case "${1:-all}" in
         test_check_justif_pdf
         test_check_cni_solange
         test_check_impot
+        test_check_async
         ;;
     edf)        test_check_facture_edf ;;
     freepro)    test_check_facture_freepro ;;
@@ -170,8 +191,9 @@ case "${1:-all}" in
     justif-pdf) test_check_justif_pdf ;;
     solange)    test_check_cni_solange ;;
     impot)      test_check_impot ;;
+    async)      test_check_async ;;
     *)
-        echo "Usage: $0 [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot]"
+        echo "Usage: $0 [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot|async]"
         exit 1
         ;;
 esac
