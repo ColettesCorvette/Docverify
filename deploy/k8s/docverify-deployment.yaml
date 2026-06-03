@@ -24,6 +24,12 @@ spec:
         env:
         - name: LLM_URL
           value: "http://vllm-mlx:8000"
+        # QUEUE_WORKERS borne le parallélisme par pod. Le total réel vaut
+        # replicas x QUEUE_WORKERS et doit rester proche de la capacité LLM
+        # cumulée, soit nb_de_Macs x 5 places de --max-num-seqs. Un seul Mac :
+        # garder 5. Pour N Macs, monter QUEUE_WORKERS ou replicas en conséquence.
+        - name: QUEUE_WORKERS
+          value: "5"
         livenessProbe:
           httpGet:
             path: /health

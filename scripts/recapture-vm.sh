@@ -6,7 +6,7 @@
 # le manifeste puis incrémenté automatiquement (26.7 -> 26.8) : plus besoin
 # d'éditer le YAML à la main, et on garde la traçabilité + le rollback par version.
 #
-# Flux : delete pod -> boot VM source -> scp+setup -> vérif -> cleanup -> shutdown
+# Flux : delete ds -> boot VM source -> scp+setup -> vérif -> cleanup -> shutdown
 #        -> attente arrêt -> purge registry -> oras push <new-tag>
 #        -> patch macos.yaml -> apply.
 #
@@ -92,9 +92,9 @@ ssh_port() { nc -z -G 2 "$VM_IP" 22 >/dev/null 2>&1; }   # nc macOS : -G = timeo
 
 # --- 1. Libérer la VM source --------------------------------------------
 step "1/7 — libérer la VM source"
-if kubectl get pod macos >/dev/null 2>&1; then
-  confirm "Supprimer le pod macos (coupe le LLM en prod pendant la recapture) ?" || die "annulé"
-  kubectl delete pod macos --wait=true
+if kubectl get daemonset vllm-mlx >/dev/null 2>&1; then
+  confirm "Supprimer le DaemonSet vllm-mlx, ce qui coupe le LLM pendant la recapture ?" || die "annulé"
+  kubectl delete daemonset vllm-mlx --wait=true
 fi
 
 # --- 2. Booter la VM source ---------------------------------------------
@@ -144,7 +144,7 @@ curl -s "http://${REGISTRY}/v2/${IMAGE_REPO}/tags/list" | grep -q "$NEW_TAG" || 
 step "7/7 — patch ${MANIFEST} (${CUR_TAG} -> ${NEW_TAG}) + apply"
 sed -i '' "s#${IMAGE_REPO}:${CUR_TAG}#${IMAGE_REPO}:${NEW_TAG}#g" "$MANIFEST"
 kubectl apply -f "$MANIFEST"
-kubectl wait --for=condition=Ready pod/macos --timeout=300s || warn "pod macos pas Ready — kubectl describe pod macos"
+kubectl rollout status daemonset/vllm-mlx --timeout=300s || warn "DaemonSet vllm-mlx pas prêt — kubectl describe ds vllm-mlx"
 
 echo -e "\n${GREEN}Recapture OK : ${IMAGE_REPO}:${NEW_TAG} déployé.${NC}"
 echo "À committer : git add ${MANIFEST}"
