@@ -1,18 +1,25 @@
 #!/bin/bash
-# Test de concurrence : envoie une rafale de requêtes SIMULTANÉES et détecte
-# la contamination cross-batch (fuite du contenu d'un document sur un autre).
+# Test de concurrence et garde anti-régression de la contamination cross-batch.
 #
-# Principe : chaque document a une date de naissance unique qui sert de
-# signature. On poste tous les documents en parallèle, puis on vérifie pour
-# chaque réponse qu'elle contient SA signature et AUCUNE signature étrangère.
+# Chaque document a une date de naissance unique qui sert de signature. On poste
+# tous les documents en parallèle, puis on vérifie que chaque réponse contient SA
+# signature et AUCUNE signature étrangère. Une fuite signale un retour de la
+# contamination du cache vllm-mlx : ce script est le garde-fou du flag
+# --disable-prefix-cache (cf. deploy/vm/com.orbinea.vllm-mlx.plist). C'est aussi
+# la base du test de charge sous rafales courtes attendu côté tuteur.
 #
 # Usage : ./concurrency-test.sh [rounds]   (défaut 2 → 8 requêtes simultanées)
-# Env   : API (défaut http://localhost:8680), MODEL
+# Config : API, MODEL, SAMPLES viennent du .env racine (cf. .env.example).
 
 set -u
+
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
-SAMPLES="/Users/dev/Desktop/LLM/ocr/samples"
+SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
 MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 ROUNDS="${1:-2}"
 OUT="$(mktemp -d)"

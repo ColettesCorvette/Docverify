@@ -14,6 +14,10 @@
 
 set -euo pipefail
 
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 WIKI_REMOTE="${WIKI_REMOTE:-ssh://git@git.int.orbinea.example:2222/tfuchs/docverify.wiki.git}"
 WIKI_DIR="${WIKI_DIR:-$HOME/docverify-wiki}"
 MSG="${1:-maj wiki depuis le repo docverify}"

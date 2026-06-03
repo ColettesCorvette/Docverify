@@ -13,6 +13,10 @@
 
 set -euo pipefail
 
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 IMAGE="${IMAGE:-docverify-docverify:latest}"
 CLUSTER="${CLUSTER:-mini-cluster}"
 DEPLOY="${DEPLOY:-docverify}"

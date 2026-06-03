@@ -89,6 +89,22 @@ Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis la VM macO
 | [Commandes utiles](https://git.int.orbinea.example/tfuchs/docverify/wiki/Commandes-utiles) | Logs, shell dans un pod, scale, recapture |
 | [Dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) | Dashboard Kubernetes, installation et accès |
 
+## Scripts
+
+Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. Les paramètres communs comme l'URL de l'API, le modèle, le chemin des samples ou le cluster se centralisent dans un `.env` à la racine : copie `.env.example` en `.env` et ajuste. Chaque script charge ce `.env` s'il existe, sinon il retombe sur ses défauts.
+
+| Script | Rôle |
+|---|---|
+| `test-api.sh` | Suite de tests HTTP contre les samples, un cas ou tous |
+| `concurrency-test.sh` | Rafale parallèle, garde anti-régression de la contamination |
+| `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring contre le groundtruth |
+| `redeploy.sh` | Rebuild image, import k3d et rollout docverify |
+| `recapture-vm.sh` | Recapture de l'image VM de bout en bout |
+| `gen-llm-backend.sh` | Génère un backend LLM Linux pour GPU discret |
+| `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
+
+Le détail de chaque script et de sa configuration est sur la page [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) du wiki.
+
 ## Machines
 
 Le développement se fait aujourd'hui sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires arrivent pour répartir la charge du LLM sur plusieurs backends : mêmes M4 Pro 12 cœurs, mais avec 24 Go de mémoire chacun.

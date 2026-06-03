@@ -25,6 +25,10 @@
 
 set -euo pipefail
 
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 VM_IP="${VM_IP:-192.168.20.10}"
 VM_USER="${VM_USER:-test}"
 VM_DIR="${VM_DIR:-$HOME/docverify-vm}"

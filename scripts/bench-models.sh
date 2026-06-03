@@ -18,9 +18,13 @@
 
 set -u
 
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
-SAMPLES="${SAMPLES:-/Users/dev/Desktop/LLM/ocr/samples}"
+SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
 MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 
 # Vérité de terrain par sample : champs attendus pour mesurer la justesse.

@@ -2,23 +2,28 @@
 # Script de test de l'API docverify (V1).
 # Usage : ./test-api.sh [health|check|all|edf|freepro|sfr|lucie|cni8493|cni8498|justif-jpg|justif-pdf|solange|impot|async]
 #
-# Variables d'env :
-#   MODEL — override du modèle LLM (défaut : Qwen2.5-VL-7B-Instruct-4bit)
-#   API   — override de l'URL docverify (défaut : http://localhost:8680)
+# Config : API, MODEL, SAMPLES viennent du .env racine (cf. .env.example), avec
+# repli sur les défauts ci-dessous. Override ponctuel : API=… ./test-api.sh …
 #
 # Chaque appel synchrone affiche l'en-tête X-Request-Id renvoyé par le serveur,
 # puis le verdict JSON, pour qu'on visualise l'identifiant de chaque requête. Le
-# cas async montre en plus le mode webhook : 202 + job_id via callback_url.
+# cas async vérifie le contrat webhook (202 + job_id) ; la livraison du callback
+# est couverte par go test → TestPostCallback.
 
 set -e
 
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
+
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
-SAMPLES="/Users/dev/Desktop/LLM/ocr/samples"
+SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
 MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
+RED='\033[0;31m'
 NC='\033[0m'
 
 separator() {
@@ -96,18 +101,27 @@ test_check_impot() {
 }
 
 test_check_async() {
-    separator "Webhook asynchrone + X-Request-Id"
+    separator "Webhook asynchrone — 202 + job_id"
     echo "→ Sync : verdict précédé de son en-tête X-Request-Id"
     post_doc -F "doc=@$SAMPLES/justifs.jpg" -F "name=LEROY" -F "surname=PIERRE" -F "postal_code=17999" -F "model=$MODEL"
     echo ""
-    echo "→ Async : callback_url renvoie 202 + job_id ; lance scripts/callback-listener.py pour voir le verdict livré"
-    curl -s -X POST "$API$ROUTE" \
+    echo "→ Async : un callback_url bascule la route en 202 + job_id."
+    echo "  La livraison du callback est couverte par 'go test ./...' (TestPostCallback)."
+    local tmp code body job
+    tmp="$(mktemp)"
+    code="$(curl -s -o "$tmp" -w '%{http_code}' -X POST "$API$ROUTE" \
         -F "doc=@$SAMPLES/justifs.jpg" \
-        -F "name=LEROY" \
-        -F "surname=PIERRE" \
-        -F "postal_code=17999" \
-        -F "callback_url=${CALLBACK_URL:-http://host.docker.internal:9999/cb}" \
-        -F "model=$MODEL" | jq
+        -F "name=LEROY" -F "surname=PIERRE" -F "postal_code=17999" \
+        -F "callback_url=http://regia.invalid/cb" -F "model=$MODEL" || echo 000)"
+    body="$(cat "$tmp")"; rm -f "$tmp"
+    echo "$body" | jq
+    job="$(echo "$body" | jq -r '.job_id // empty')"
+    if [ "$code" = "202" ] && [ -n "$job" ]; then
+        echo -e "${GREEN}✓ async OK : HTTP 202, job_id=$job${NC}"
+    else
+        echo -e "${RED}✗ async KO : HTTP ${code:-?}, job_id='${job:-absent}'${NC}"
+        return 1
+    fi
 }
 
 # --- Dispatcher ---------------------------------------------------------
