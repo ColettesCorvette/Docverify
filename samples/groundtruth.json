@@ -152,13 +152,21 @@
     },
     "impot": {
       "file": "impot_exemple.pdf",
-      "input": {},
+      "input": {
+        "name": "DURAND",
+        "surname": "SOLANGE",
+        "postal_code": "99000"
+      },
       "expected": {
         "doc_type": null,
+        "name_found": true,
+        "surname_found": true,
+        "postal_found": true,
+        "date_found": true,
         "ok": null,
         "unreadable": false
       },
-      "notes": "PDF avis d'impôt, texte natif. doc_type laissé null car ambigu : facture / courrier selon les heuristiques de mots-clés (le doc contient 'total à payer' qui scorera facture). À fixer si Regia précise le contrat d'attente pour ce type."
+      "notes": "Avis de Taxe Foncière 2025 au nom de DURAND SOLANGE, 99000 VILLEFRANCHE (même personne que la CNI solange). PDF natif → pdftotext suffit. name/surname/postal/date trouvés. doc_type=null : classé 'facture' par les mots-clés ('somme à payer') alors que c'est un avis d'imposition sans type dédié. ok=null : le système retient 11/08/2025 et applique valid_months=3 → 'Document trop ancien' (ok:false) ; à trancher avec Regia car un avis d'impôt est un justificatif annuel, pas trimestriel."
     }
   }
 }

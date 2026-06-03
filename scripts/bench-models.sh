@@ -35,7 +35,7 @@ SPECS=(
     "justif-jpg|justifs.jpg|name=LEROY&surname=PIERRE&postal_code=17999"
     "justif-pdf|justif2.pdf|name=ORBINEA&postal_code=99000"
     "solange|carte_identite_Solange.png|name=DURAND&surname=SOLANGE"
-    "impot|impot_exemple.pdf|"
+    "impot|impot_exemple.pdf|name=DURAND&surname=SOLANGE&postal_code=99000"
 )
 
 run_one() {

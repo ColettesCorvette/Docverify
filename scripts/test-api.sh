@@ -120,9 +120,12 @@ test_check_cni_solange() {
 }
 
 test_check_impot() {
-    separator "POST $ROUTE — impot_exemple.pdf"
+    separator "POST $ROUTE — impot_exemple.pdf (DURAND SOLANGE, 99000)"
     curl -s -X POST "$API$ROUTE" \
         -F "doc=@$SAMPLES/impot_exemple.pdf" \
+        -F "name=DURAND" \
+        -F "surname=SOLANGE" \
+        -F "postal_code=99000" \
         -F "model=$MODEL" | jq
 }
 
