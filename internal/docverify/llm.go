@@ -212,7 +212,10 @@ func isRetryableLLMErr(err error) bool {
 // contexte parent pour pouvoir être interrompu si le client HTTP raccroche
 // avant même que le LLM ne soit sollicité.
 func pingLLM(ctx context.Context, llmURL string) error {
-	pingCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// 15 s (et non 5 s) pour tolérer un démarrage à froid de vllm-mlx : juste
+	// après un boot/recapture, le serveur met quelques secondes à répondre sur
+	// /v1/models, et un ping trop court renvoyait un faux « endpoint injoignable ».
+	pingCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	url := strings.TrimRight(llmURL, "/") + "/v1/models"
 	req, err := http.NewRequestWithContext(pingCtx, http.MethodGet, url, nil)
