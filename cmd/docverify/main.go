@@ -49,7 +49,7 @@ func runBatch(data []byte) {
 	}
 
 	if batch.Model == "" {
-		batch.Model = dc.DefaultModel
+		batch.Model = dc.DefaultModelName()
 	}
 	if batch.LLMURL == "" {
 		batch.LLMURL = dc.DefaultLLMURL()
@@ -193,7 +193,7 @@ func runLegacy(data []byte) {
 		input.ValidMonths = 3
 	}
 	if input.Model == "" {
-		input.Model = dc.DefaultModel
+		input.Model = dc.DefaultModelName()
 	}
 	if input.LLMURL == "" {
 		input.LLMURL = dc.DefaultLLMURL()

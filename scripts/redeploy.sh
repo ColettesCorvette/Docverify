@@ -9,7 +9,9 @@
 #   DEPLOY       — nom du Deployment (défaut : docverify)
 #   SKIP_GOBUILD — si =1, saute la validation go build locale
 #
-# Prérequis : colima + k3d up, kubectl pointant sur le cluster.
+# Prérequis : Docker Desktop + k3d up (context desktop-linux), kubectl pointant
+# sur le cluster. Le backend LLM est Docker Model Runner côté hôte, atteint par
+# les pods via le proxy host.k3d.internal:12435 (LaunchAgent com.orbinea.dmr-proxy).
 
 set -euo pipefail
 

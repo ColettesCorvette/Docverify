@@ -30,6 +30,16 @@ func DefaultLLMURL() string {
 	return "http://localhost:8000"
 }
 
+// DefaultModelName retourne le modèle LLM par défaut.
+// Variable d'env : LLM_MODEL. Fallback : constante DefaultModel.
+// Utilisé quand la requête ne précise pas de modèle, par le serveur et le CLI.
+func DefaultModelName() string {
+	if m := os.Getenv("LLM_MODEL"); m != "" {
+		return m
+	}
+	return DefaultModel
+}
+
 // StartServer démarre le serveur HTTP docverify sur :8680.
 //
 // Utilise le ServeMux et ses patterns méthode "METHOD /path/{var}", introduits en Go 1.22.
@@ -125,7 +135,7 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 
 		model := r.FormValue("model")
 		if model == "" {
-			model = DefaultModel
+			model = DefaultModelName()
 		}
 		llmURL := r.FormValue("llm_url")
 		if llmURL == "" {
