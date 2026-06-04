@@ -14,7 +14,7 @@ import (
 // Il encode en clair l'identité et l'adresse du titulaire et porte une
 // signature ECDSA. Le décoder donne une extraction fiable sans OCR ni LLM ;
 // pour une facture qui en porte un, tout le pipeline lourd est court-circuité,
-// ce qui allège d'autant la charge vllm-mlx.
+// ce qui allège d'autant la charge du backend LLM.
 //
 // Périmètre : extraction des données — identité, adresse, date d'émission. La
 // signature ECDSA n'est pas vérifiée et ne le sera pas : on fait confiance au

@@ -16,9 +16,9 @@ import (
 	"time"
 )
 
-const DefaultModel = "mlx-community/Qwen2.5-VL-7B-Instruct-4bit"
+const DefaultModel = "docker.io/ai/gemma3:4B-Q4_K_M"
 
-// --- Format OpenAI-compatible (vllm-mlx, vLLM, etc. via /v1) ---------------
+// --- Format OpenAI-compatible, via /v1 (Docker Model Runner, vLLM, etc.) ---
 
 type chatMessage struct {
 	Role    string        `json:"role"`
@@ -56,8 +56,8 @@ type chatResponse struct {
 }
 
 // llmHTTPClient est partagé entre tous les appels RunLLM pour réutiliser
-// les connexions TCP vers vllm-mlx (keepalive). Le timeout par requête est
-// piloté par le contexte transmis, pas par le client.
+// les connexions TCP vers le backend LLM (keepalive). Le timeout par requête
+// est piloté par le contexte transmis, pas par le client.
 var llmHTTPClient = &http.Client{
 	Transport: &http.Transport{
 		MaxIdleConns:        10,
@@ -66,16 +66,16 @@ var llmHTTPClient = &http.Client{
 	},
 }
 
-// Anti-contamination : aucun nonce dans le prompt. L'isolation entre requêtes
-// repose entièrement sur --disable-prefix-cache côté vllm-mlx (voir
-// deploy/vm/com.orbinea.vllm-mlx.plist). Sans ce flag, le prefix-cache multimodal
-// réutilise le KV des placeholders image entre requêtes au prompt identique et
-// fait FUITER le contenu d'une image sur la suivante (ex. solange transcrite avec
-// les données du passeport cni8493). Un nonce [req:N] avait été essayé mais ne
-// suffit pas seul sous rafale : NE PAS réactiver le prefix-cache sans rétablir
-// une parade équivalente.
+// Anti-contamination : aucun nonce dans le prompt. Le backend est désormais
+// Docker Model Runner (llama.cpp), différent moteur que l'ancien vllm-mlx.
+// Garde-fou conservé : `concurrency-test.sh` vérifie sous rafale qu'aucune
+// réponse ne fuit le contenu d'une autre requête. Historique : sur vllm-mlx,
+// le prefix-cache multimodal réutilisait le KV des placeholders image et
+// faisait FUITER une image sur la suivante ; la parade était
+// --disable-prefix-cache. Si une contamination réapparaît sous DMR, traiter
+// le cache de prompt du backend de la même façon avant tout retour au nonce.
 
-// RunLLM appelle l'endpoint OpenAI-compatible (vllm-mlx, vLLM, etc.)
+// RunLLM appelle l'endpoint OpenAI-compatible (Docker Model Runner, vLLM, etc.)
 // pour transcrire l'image fournie. Le contexte propage l'annulation côté
 // client HTTP et le timeout global du job.
 func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error) {
@@ -192,7 +192,7 @@ func doLLMPost(ctx context.Context, apiURL string, body []byte) (*http.Response,
 }
 
 // isRetryableLLMErr matche les erreurs transient connues : keepalive cassé
-// après crash vllm-mlx, reset TCP, broken pipe. Les timeouts contextuels ne
+// après crash du backend, reset TCP, broken pipe. Les timeouts contextuels ne
 // sont pas retentés.
 func isRetryableLLMErr(err error) bool {
 	if err == nil {
@@ -212,8 +212,8 @@ func isRetryableLLMErr(err error) bool {
 // contexte parent pour pouvoir être interrompu si le client HTTP raccroche
 // avant même que le LLM ne soit sollicité.
 func pingLLM(ctx context.Context, llmURL string) error {
-	// 15 s (et non 5 s) pour tolérer un démarrage à froid de vllm-mlx : juste
-	// après un boot/recapture, le serveur met quelques secondes à répondre sur
+	// 15 s (et non 5 s) pour tolérer un démarrage à froid du backend : juste
+	// après un démarrage, le serveur met quelques secondes à répondre sur
 	// /v1/models, et un ping trop court renvoyait un faux « endpoint injoignable ».
 	pingCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()

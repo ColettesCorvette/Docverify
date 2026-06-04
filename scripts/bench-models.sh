@@ -5,7 +5,7 @@
 # capture la réponse. Sortie : JSON lignes (un objet par sample) sur stdout.
 #
 # Usage :
-#   MODEL=mlx-community/Qwen2.5-VL-7B-Instruct-4bit ./scripts/bench-models.sh > /tmp/bench-qwen7.jsonl
+#   MODEL=docker.io/ai/gemma3:4B-Q4_K_M ./scripts/bench-models.sh > /tmp/bench-gemma3.jsonl
 #   
 #
 # Comparer ensuite :
@@ -13,7 +13,7 @@
 #
 # Pré-requis :
 #   - docverify lancé en cluster (kubectl get pods)
-#   - vllm-mlx démarré sur le modèle ciblé (skill /serve-mlx ou launchctl)
+#   - Docker Model Runner actif avec le modèle pullé (docker model ls)
 #   - jq disponible localement
 
 set -u
@@ -25,7 +25,7 @@ if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
-MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
+MODEL="${MODEL:-docker.io/ai/gemma3:4B-Q4_K_M}"
 
 # Vérité de terrain par sample : champs attendus pour mesurer la justesse.
 # Chaque ligne = sample|file|champs multipart à passer.

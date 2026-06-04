@@ -8,7 +8,7 @@
 #   - sort matches / total + liste des mismatches
 #
 # Usage :
-#   ./scripts/score-bench.sh /tmp/bench-qwen32.jsonl
+#   ./scripts/score-bench.sh /tmp/bench-gemma3.jsonl
 #
 # Variables d'env :
 #   GROUNDTRUTH — chemin du JSON vérité (défaut : samples/groundtruth.json relatif au script)

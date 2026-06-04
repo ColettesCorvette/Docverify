@@ -11,7 +11,7 @@
 #
 # Prérequis : Docker Desktop + k3d up (context desktop-linux), kubectl pointant
 # sur le cluster. Le backend LLM est Docker Model Runner côté hôte, atteint par
-# les pods via le proxy host.k3d.internal:12435 (LaunchAgent com.orbinea.dmr-proxy).
+# les pods via host.k3d.internal:12434 (TCP host-side activé dans Docker Desktop).
 
 set -euo pipefail
 

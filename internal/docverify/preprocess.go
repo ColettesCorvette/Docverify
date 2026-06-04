@@ -55,7 +55,7 @@ func isImageMagickAvailable() bool {
 
 // llmDownscaleLimit borne la taille du fichier source au-delà de laquelle on
 // réduit la définition avant l'envoi au LLM. Un base64 trop lourd fait hang
-// le GPU Metal de vllm-mlx (observé en cluster sur des scans > 2 Mo).
+// le GPU Metal du backend LLM (observé en cluster sur des scans > 2 Mo).
 const llmDownscaleLimit = 2 * (1 << 20) // 2 Mo
 
 // preprocessForLLM prépare une image pour l'envoi au LLM vision.

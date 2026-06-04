@@ -108,7 +108,7 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 
 	// 2D-DOC : cachet Datamatrix des justificatifs FR. Données signées, en clair
 	// → extraction fiable sans OCR ni LLM. Présent, on court-circuite tout le
-	// pipeline (la facture n'atteint jamais le LLM, ce qui décharge vllm-mlx).
+	// pipeline (la facture n'atteint jamais le LLM, ce qui décharge le backend LLM).
 	// Absent ou illisible, on poursuit le pipeline OCR normal.
 	if analysis, ok := TryTwoDDOC(ctx, job.FilePath, job.Input); ok {
 		log.Printf("   2D-DOC détecté — pipeline court-circuité")
@@ -142,7 +142,7 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 	if !usedLLM && scoreAnalysis(analysis) < segmentationTriggerScore && !IsPDF(job.FilePath) {
 		// Sur un document multi-zones (recto+verso de CNI sur une A4), le LLM
 		// full-page est presque toujours supplanté par la segmentation. On le
-		// saute alors pour économiser un appel LLM et alléger la charge vllm
+		// saute alors pour économiser un appel LLM et alléger la charge du backend LLM
 		// sous rafale (detectRegions = ImageMagick, hors goulot LLM).
 		if regions, _ := detectRegions(job.FilePath); len(regions) >= 2 {
 			log.Printf("   Score initial=%d (Tesseract), %d zones — full-page sauté, segmentation directe",

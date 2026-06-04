@@ -631,7 +631,7 @@ type Document struct {
 }
 
 // BatchInput est le format d'entrée pour un batch (individus + documents).
-// LLMURL cible un endpoint OpenAI-compatible (vllm-mlx, vLLM, Ollama via /v1).
+// LLMURL cible un endpoint OpenAI-compatible (Docker Model Runner, vLLM, Ollama via /v1).
 type BatchInput struct {
 	Individuals []Individual `json:"individuals"`
 	Documents   []Document   `json:"documents"`

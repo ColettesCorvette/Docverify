@@ -21,13 +21,13 @@ const statusClientClosed = 499
 const maxUploadBytes = 30 << 20
 
 // DefaultLLMURL retourne l'URL de l'endpoint LLM OpenAI-compatible par défaut.
-// Variable d'env : LLM_URL. Fallback : vllm-mlx local sur :8000.
+// Variable d'env : LLM_URL. Fallback : Docker Model Runner local.
 // Utilisé à la fois par le serveur HTTP et le CLI.
 func DefaultLLMURL() string {
 	if url := os.Getenv("LLM_URL"); url != "" {
 		return url
 	}
-	return "http://localhost:8000"
+	return "http://localhost:12434/engines"
 }
 
 // DefaultModelName retourne le modèle LLM par défaut.

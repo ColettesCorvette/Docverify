@@ -19,7 +19,7 @@ if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
-MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
+MODEL="${MODEL:-docker.io/ai/gemma3:4B-Q4_K_M}"
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'

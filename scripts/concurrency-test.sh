@@ -3,10 +3,9 @@
 #
 # Chaque document a une date de naissance unique qui sert de signature. On poste
 # tous les documents en parallèle, puis on vérifie que chaque réponse contient SA
-# signature et AUCUNE signature étrangère. Une fuite signale un retour de la
-# contamination du cache vllm-mlx : ce script est le garde-fou du flag
-# --disable-prefix-cache (cf. deploy/vm/com.orbinea.vllm-mlx.plist). C'est aussi
-# la base du test de charge sous rafales courtes attendu côté tuteur.
+# signature et AUCUNE signature étrangère. Une fuite signale une contamination
+# d'une requête à l'autre côté backend LLM. C'est aussi la base du test de
+# charge sous rafales courtes attendu côté tuteur.
 #
 # Usage : ./concurrency-test.sh [rounds]   (défaut 2 → 8 requêtes simultanées)
 # Config : API, MODEL, SAMPLES viennent du .env racine (cf. .env.example).
@@ -20,7 +19,7 @@ if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
-MODEL="${MODEL:-mlx-community/Qwen2.5-VL-7B-Instruct-4bit}"
+MODEL="${MODEL:-docker.io/ai/gemma3:4B-Q4_K_M}"
 ROUNDS="${1:-2}"
 OUT="$(mktemp -d)"
 
