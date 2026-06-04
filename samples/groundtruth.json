@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "2026-05-27",
+    "version": "2026-06-04",
     "samples_dir": "/Users/dev/Desktop/LLM/ocr/samples",
-    "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, etc.). Compléter les dates au fil des inspections manuelles."
+    "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, expiration des pièces d'identité, etc.). 2026-06-04 : cni8493 et solange passés à ok:false car les pièces sont périmées (un justificatif périmé doit être rejeté) ; auparavant ok:true à tort. Compléter les dates au fil des inspections manuelles."
   },
   "samples": {
     "edf": {
@@ -79,10 +79,10 @@
         "doc_type": "passeport",
         "name_found": true,
         "date_found": true,
-        "ok": true,
+        "ok": false,
         "unreadable": false
       },
-      "notes": "Passeport marocain BEN AMAR. Sample qui timeoute sur Qwen-32B (GPU hang Metal). Idéal pour tester la robustesse multi-modèles."
+      "notes": "Passeport marocain BEN AMAR, expiration 22/09/2021 → périmé → ok:false légitime (corrigé le 2026-06-04 ; auparavant ok:true à tort, ce qui pénalisait les modèles détectant l'expiration). Sample qui timeoute sur Qwen-32B (GPU hang Metal). Idéal pour tester la robustesse multi-modèles."
     },
     "cni8498": {
       "file": "index_8498_1_1200.png",
@@ -145,10 +145,10 @@
         "name_found": true,
         "surname_found": true,
         "date_found": true,
-        "ok": true,
+        "ok": false,
         "unreadable": false
       },
-      "notes": "CNI française biométrique N&B recto+verso sur la même page (2480x3508, 2.6 Mo). Identité : DURAND SOLANGE GERMAINE, nom d'usage BEUR, née le 03/07/1962. La passe Tesseract initiale extrait du contenu utile mais bruité (date OCRisée 91.09:1959, MRZ TD1 à 35 chars au lieu de 30). Inputs corrigés le 2026-05-27 pour refléter le doc : SOLANGE est prénom, pas nom."
+      "notes": "CNI française biométrique N&B recto+verso sur la même page (2480x3508, 2.6 Mo). Identité : DURAND SOLANGE GERMAINE, nom d'usage BEUR, née le 03/07/1962, expiration 01/06/2020 → périmée → ok:false légitime (corrigé le 2026-06-04). La passe Tesseract initiale extrait du contenu utile mais bruité (date OCRisée 91.09:1959, MRZ TD1 à 35 chars au lieu de 30). Inputs corrigés le 2026-05-27 pour refléter le doc : SOLANGE est prénom, pas nom."
     },
     "impot": {
       "file": "impot_exemple.pdf",
