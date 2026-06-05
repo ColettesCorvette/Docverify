@@ -12,7 +12,9 @@ La documentation détaillée vit dans le [wiki](https://git.int.orbinea.example/
 
 Regia envoie le document en POST sur l'API. Le serveur le dépose dans une queue interne, un pool de workers le traite, puis le fichier temporaire est supprimé et le verdict est renvoyé. La queue vit dans le processus de chaque pod : un simple channel Go alimenté par les requêtes et consommé par les workers. Elle borne ainsi le nombre d'appels simultanés au LLM sans dépendre d'un Redis.
 
-Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si le document porte un cachet 2D-DOC, le Datamatrix signé des justificatifs de domicile français, docverify le lit directement et court-circuite tout le reste : l'identité, l'adresse et la date sortent des données signées, sans OCR ni LLM. Sinon le texte est extrait par `pdftotext` pour un PDF natif, ou par Tesseract pour une image à fond simple. Quand cette extraction est trop pauvre, ou que le fond est complexe comme sur un passeport, docverify bascule sur le LLM multimodal. En dernier recours, si la page semble contenir plusieurs documents, par exemple un recto et un verso de carte d'identité scannés ensemble, elle est découpée en zones traitées séparément. À chaque étape, un nouveau résultat n'est conservé que s'il extrait plus d'informations que le précédent.
+Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si le document porte un cachet 2D-DOC, le Datamatrix signé des justificatifs de domicile français, docverify le lit directement et court-circuite tout le reste : l'identité, l'adresse et la date sortent des données signées, sans OCR ni LLM. Sa signature cryptographique est en plus vérifiée contre la liste des certificats des autorités ANTS embarquée dans le binaire, ce qui authentifie le cachet. Sinon le texte est extrait par `pdftotext` pour un PDF natif, ou par Tesseract pour une image à fond simple. Quand cette extraction est trop pauvre, ou que le fond est complexe comme sur un passeport, docverify bascule sur le LLM multimodal. En dernier recours, si la page semble contenir plusieurs documents, par exemple un recto et un verso de carte d'identité scannés ensemble, elle est découpée en zones traitées séparément. À chaque étape, un nouveau résultat n'est conservé que s'il extrait plus d'informations que le précédent.
+
+Le verdict porte un niveau de confiance à quatre paliers, de `nul` à `haut`, qui reflète le chemin ayant produit le résultat : un 2D-DOC à signature vérifiée ou un OCR net donnent `haut`, le LLM plafonne à `moyen`, une rescousse par segmentation reste `bas`, un document illisible est `nul`. Regia s'en sert pour décider de l'automatisation : `haut` passe seul, `moyen` ou `bas` demandent une confirmation manuelle, `nul` est rejeté.
 
 Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma3-4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via `host.k3d.internal`. Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
 
@@ -71,7 +73,7 @@ kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et s
 ./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
 ```
 
-Les pods atteignent le runner via `host.k3d.internal:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `scripts/gen-llm-backend.sh` détecte le GPU discret et génère un manifeste vLLM équivalent.
+Les pods atteignent le runner via `host.k3d.internal:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
 
 ## Documentation
 
@@ -92,11 +94,14 @@ Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. 
 | `concurrency-test.sh` | Rafale parallèle, garde anti-régression de la contamination |
 | `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring contre le groundtruth |
 | `redeploy.sh` | Rebuild image, import k3d et rollout docverify |
-| `gen-llm-backend.sh` | Génère un backend LLM Linux pour GPU discret, alternative au runner hôte |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
+
+Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh` ; elles remplacent l'ancien `gen-llm-backend.sh`, conservé mais obsolète.
 
 Le détail de chaque script et de sa configuration est sur la page [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) du wiki.
 
 ## Machines
 
-Le développement se fait aujourd'hui sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires arrivent pour répartir la charge du LLM sur plusieurs backends : mêmes M4 Pro 12 cœurs, mais avec 24 Go de mémoire chacun.
+Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM sur plusieurs backends.
+
+La mise à l'échelle multi-Mac évolue vers un vrai cluster Kubernetes à plusieurs nœuds : chaque Mac héberge un nœud k3s dans une VM Linux légère bridgée sur le LAN, les nœuds rejoignent automatiquement le serveur par token, et le DMR Metal reste host-natif sur chaque Mac. Cette approche a été validée en spike sur deux Macs ; son industrialisation est en cours. Une machine Linux à GPU peut rejoindre le même cluster nativement, sans VM, et y servir le LLM via vLLM. Le déploiement de production reste pour l'instant un k3d autonome par Mac.
