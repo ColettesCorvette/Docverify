@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# OBSOLÈTE — remplacé par deploy/llm/ : des images vLLM préparées et versionnées
+# par accélérateur cuda/rocm/xpu/cpu plutôt qu'un manifeste généré à la volée.
+# Conservé pour référence de la détection GPU. Voir deploy/llm/README.md.
+#
 # gen-llm-backend.sh — génère un manifeste Kubernetes de backend LLM pour une
 # machine Linux à GPU discret, derrière le même Service vllm-mlx que la VM macOS.
 # docverify n'est pas modifié : il parle OpenAI à http://vllm-mlx:8000 quel que

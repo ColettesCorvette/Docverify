@@ -1,0 +1,17 @@
+# Backend LLM vLLM pour machine NVIDIA CUDA.
+# Image officielle vLLM, dont l'entrypoint est déjà le serveur OpenAI : on
+# épingle la version et on fixe nos paramètres de service par défaut.
+# Le modèle est téléchargé depuis Hugging Face au démarrage, pas embarqué.
+#
+# Build : VLLM_VERSION=v0.18.0 PLATFORM=cuda ./deploy/llm/build.sh
+# Run   : nécessite --gpus all et --ipc=host, ou la ressource nvidia.com/gpu en K8s.
+ARG VLLM_VERSION=latest
+FROM vllm/vllm-openai:${VLLM_VERSION}
+
+EXPOSE 8000
+
+# Paramètres surchargés par les args du conteneur ou du Deployment K8s.
+# --no-enable-prefix-caching reprend la parade anti-contamination déjà éprouvée.
+CMD ["--model", "Qwen/Qwen2.5-VL-7B-Instruct", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--max-num-seqs", "5", "--no-enable-prefix-caching"]

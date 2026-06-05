@@ -1,0 +1,16 @@
+# Backend LLM vLLM pour GPU Intel Arc / Flex / Max via XPU.
+# Image XPU officielle d'Intel. Si une image ipex-llm est utilisée à la place,
+# l'entrypoint devient ipex_llm.vllm.xpu.entrypoints.openai.api_server : à
+# vérifier sur le matériel Arc, les deux variantes coexistent côté Intel.
+#
+# Build : VLLM_VERSION=0.10.2 PLATFORM=xpu ./deploy/llm/build.sh
+# Run   : nécessite --device /dev/dri, ou la ressource gpu.intel.com/i915 en K8s.
+ARG VLLM_VERSION=latest
+FROM intel/vllm:${VLLM_VERSION}
+
+EXPOSE 8000
+
+# max-num-seqs abaissé : la VRAM des Arc est plus contrainte qu'un GPU datacenter.
+CMD ["--model", "Qwen/Qwen2.5-VL-7B-Instruct", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--max-num-seqs", "2", "--no-enable-prefix-caching"]

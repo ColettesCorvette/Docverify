@@ -1,0 +1,25 @@
+# Backend LLM vLLM CPU. Aucune image officielle prête : on build depuis les
+# sources vLLM avec la cible CPU. Lent par nature, c'est un fallback fonctionnel
+# ou de développement, pas une cible de production : le bench DMR CPU vs Metal a
+# montré qu'un VLM 7B en CPU dépasse le timeout sous charge.
+#
+# Référence canonique si ce build dérive : docker/Dockerfile.cpu du dépôt vLLM.
+# À valider sur la machine cible. Build : PLATFORM=cpu ./deploy/llm/build.sh
+ARG VLLM_VERSION=v0.18.0
+FROM python:3.12-slim AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git build-essential cmake numactl libnuma-dev \
+ && rm -rf /var/lib/apt/lists/*
+
+ARG VLLM_VERSION
+RUN git clone --depth 1 --branch "${VLLM_VERSION}" https://github.com/vllm-project/vllm.git /vllm
+WORKDIR /vllm
+RUN pip install --no-cache-dir -r requirements/cpu.txt \
+ && VLLM_TARGET_DEVICE=cpu pip install --no-cache-dir -e .
+
+EXPOSE 8000
+ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]
+CMD ["--model", "Qwen/Qwen2.5-VL-7B-Instruct", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--max-num-seqs", "2", "--no-enable-prefix-caching"]

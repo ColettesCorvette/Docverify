@@ -1,0 +1,15 @@
+# Backend LLM vLLM pour machine AMD ROCm.
+# Image officielle vLLM ROCm, qui remplace depuis janvier 2026 les anciennes
+# rocm/vllm et rocm/vllm-dev. Entrypoint = serveur OpenAI.
+#
+# Build : VLLM_VERSION=latest PLATFORM=rocm ./deploy/llm/build.sh
+# Run   : nécessite --device /dev/kfd --device /dev/dri --group-add=video,
+#         ou la ressource amd.com/gpu en K8s.
+ARG VLLM_VERSION=latest
+FROM vllm/vllm-openai-rocm:${VLLM_VERSION}
+
+EXPOSE 8000
+
+CMD ["--model", "Qwen/Qwen2.5-VL-7B-Instruct", \
+     "--host", "0.0.0.0", "--port", "8000", \
+     "--max-num-seqs", "5", "--no-enable-prefix-caching"]

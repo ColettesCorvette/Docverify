@@ -1,0 +1,64 @@
+# Backend LLM vLLM sur une machine Linux à accélérateur. docverify reste
+# inchangé : il parle OpenAI au Service vllm (LLM_URL=http://vllm:8000/v1).
+#
+# Adapter selon la plateforme du node :
+#   - image    : docverify-vllm-{cuda|rocm|xpu|cpu}:<version> construite par build.sh
+#   - ressource: décommenter la limite correspondant à l'accélérateur
+#   - nodeSelector : cibler les nodes du bon type si le cluster est hétérogène
+#
+# Prérequis cluster : le device plugin de l'accélérateur doit être installé
+# (NVIDIA device plugin, AMD GPU operator, Intel device plugin). Le modèle est
+# téléchargé depuis Hugging Face au premier démarrage ; prévoir un volume de
+# cache et HF_TOKEN si besoin.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      # nodeSelector:
+      #   orbinea/accel: cuda        # ou rocm | xpu | cpu
+      containers:
+      - name: vllm
+        image: docverify-vllm-cuda:latest
+        ports:
+        - name: http
+          containerPort: 8000
+        resources:
+          limits:
+            nvidia.com/gpu: "1"      # CUDA
+            # amd.com/gpu: "1"       # ROCm
+            # gpu.intel.com/i915: "1" # Intel Arc / XPU
+            # CPU : retirer le bloc GPU et fixer cpu/memory
+        # HF_TOKEN via Secret si le modèle est gated :
+        # env:
+        # - name: HF_TOKEN
+        #   valueFrom: { secretKeyRef: { name: hf-token, key: token } }
+        volumeMounts:
+        - name: hf-cache
+          mountPath: /root/.cache/huggingface
+      volumes:
+      - name: hf-cache
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vllm
+spec:
+  type: ClusterIP
+  selector:
+    app: vllm
+  ports:
+  - port: 8000
+    targetPort: 8000
