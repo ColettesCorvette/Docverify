@@ -35,8 +35,64 @@ type AnalysisResult struct {
 	IssueDate  string            `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
 	BirthDate  string            `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
 	Unreadable bool              `json:"unreadable,omitempty"` // document illisible, review humaine requise
-	Errors     []string          `json:"errors,omitempty"`
-	RawText    string            `json:"raw_text,omitempty"`
+	// Confidence : niveau de confiance dans l'extraction (pas la validité).
+	// nul | bas | moyen | haut. Sert à Regia pour décider de l'automatisation :
+	// haut → auto, moyen/bas → confirmation manuelle, nul → rejet/review.
+	Confidence string   `json:"confidence,omitempty"`
+	Errors     []string `json:"errors,omitempty"`
+	RawText    string   `json:"raw_text,omitempty"`
+	// source trace le chemin qui a produit le résultat ; non sérialisé,
+	// renseigné par le pipeline pour calculer Confidence.
+	source confidenceSource
+}
+
+// confidenceSource identifie le chemin d'extraction, base du niveau de confiance.
+type confidenceSource int
+
+const (
+	srcUnknown   confidenceSource = iota // chemin non renseigné (CLI direct)
+	srcTwoDDOC                           // cachet 2D-DOC signé, données en clair
+	srcTesseract                         // OCR Tesseract direct
+	srcLLM                               // fallback LLM vision (pleine page ou extraction directe)
+	srcSegment                           // rescousse par segmentation
+)
+
+const (
+	confNul   = "nul"
+	confBas   = "bas"
+	confMoyen = "moyen"
+	confHaut  = "haut"
+)
+
+// computeConfidence mappe (chemin, richesse d'extraction) vers un palier.
+// Conservateur : ne promet "haut" que sur données signées ou OCR net, le LLM
+// plafonne à "moyen", la segmentation de rescousse reste "bas". scoreAnalysis
+// (0-9) sert de proxy de richesse des champs extraits.
+func computeConfidence(a AnalysisResult) string {
+	if a.Unreadable {
+		return confNul
+	}
+	score := scoreAnalysis(a)
+	switch a.source {
+	case srcTwoDDOC:
+		return confHaut
+	case srcSegment:
+		return confBas
+	case srcLLM:
+		if score >= 4 {
+			return confMoyen
+		}
+		return confBas
+	default: // srcTesseract et srcUnknown : OCR net = haut
+		switch {
+		case score >= 5:
+			return confHaut
+		case score >= 4:
+			return confMoyen
+		default:
+			return confBas
+		}
+	}
 }
 
 // minOCRChars : seuil sous lequel on considère que l'OCR a échoué.
@@ -406,6 +462,7 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 		result.DocType = DocTypeUnknown
 		result.Unreadable = true
 		result.OK = false
+		result.Confidence = confNul
 		result.Errors = append(result.Errors, "Document illisible — review manuelle requise")
 		return result
 	}
@@ -489,6 +546,7 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 	if result.DocType == DocTypeUnknown && !result.NameFound && !result.PostalFound && !result.DateFound {
 		result.Unreadable = true
 		result.OK = false
+		result.Confidence = confNul
 		result.Errors = append(result.Errors, "Document illisible — review manuelle requise")
 		return result
 	}
@@ -501,6 +559,7 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 		surname:     input.Surname,
 		postalCodes: input.PostalCodes,
 	})
+	result.Confidence = computeConfidence(result)
 	return result
 }
 

@@ -161,3 +161,37 @@ func TestEvaluateVerdictFacturePostalRequis(t *testing.T) {
 		t.Error("facture sans code postal jugée valide")
 	}
 }
+
+func TestComputeConfidence(t *testing.T) {
+	// Champs riches : nom + type + dates → scoreAnalysis élevé.
+	rich := AnalysisResult{
+		NameFound: true, DocType: DocTypeID, DateFound: true,
+		DateValid: true, ExpiryDate: "01/01/2030",
+	}
+	// Champs pauvres : un seul signal.
+	poor := AnalysisResult{NameFound: true, DocType: DocTypeUnknown}
+
+	cases := []struct {
+		name string
+		a    AnalysisResult
+		src  confidenceSource
+		want string
+	}{
+		{"unreadable -> nul", AnalysisResult{Unreadable: true}, srcTesseract, confNul},
+		{"2D-DOC -> haut", rich, srcTwoDDOC, confHaut},
+		{"2D-DOC même pauvre -> haut", poor, srcTwoDDOC, confHaut},
+		{"Tesseract net -> haut", rich, srcTesseract, confHaut},
+		{"Tesseract pauvre -> bas", poor, srcTesseract, confBas},
+		{"LLM riche -> moyen (plafonné)", rich, srcLLM, confMoyen},
+		{"LLM pauvre -> bas", poor, srcLLM, confBas},
+		{"segmentation -> bas même riche", rich, srcSegment, confBas},
+		{"inconnu riche -> haut", rich, srcUnknown, confHaut},
+	}
+	for _, c := range cases {
+		a := c.a
+		a.source = c.src
+		if got := computeConfidence(a); got != c.want {
+			t.Errorf("%s: got %q, want %q (score=%d)", c.name, got, c.want, scoreAnalysis(a))
+		}
+	}
+}

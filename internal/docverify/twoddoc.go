@@ -176,6 +176,8 @@ func AnalyzeFrom2DDOC(d *TwoDDoc, input Input) AnalysisResult {
 		surname:     input.Surname,
 		postalCodes: input.PostalCodes,
 	})
+	a.source = srcTwoDDOC
+	a.Confidence = computeConfidence(a)
 	return a
 }
 

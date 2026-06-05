@@ -129,6 +129,11 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 	}
 
 	analysis := AnalyzeText(rawText, job.Input)
+	if usedLLM {
+		analysis.source = srcLLM
+	} else {
+		analysis.source = srcTesseract
+	}
 	debug := os.Getenv("DOCVERIFY_DEBUG_OCR") == "1"
 	if debug {
 		debugLogRawText("initial", analysis)
@@ -162,6 +167,7 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 					log.Printf("   LLM full-page retenu: score %d -> %d",
 						scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
 					analysis = llmAnalysis
+					analysis.source = srcLLM
 				} else {
 					log.Printf("   LLM full-page n'améliore pas, conservation initiale")
 				}
@@ -184,12 +190,14 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 				log.Printf("   Segmentation retenue: score %d -> %d",
 					scoreAnalysis(analysis), scoreAnalysis(segAnalysis))
 				analysis = segAnalysis
+				analysis.source = srcSegment
 			} else {
 				log.Printf("   Segmentation n'améliore pas, résultat initial conservé")
 			}
 		}
 	}
 
+	analysis.Confidence = computeConfidence(analysis)
 	analysis.RawText = ""
 	return JobResult{Analysis: analysis}
 }
