@@ -21,7 +21,7 @@ import (
 	"crypto/sha256"
 	"crypto/sha512"
 	"crypto/x509"
-	_ "embed"
+	"embed"
 	"encoding/base32"
 	"encoding/base64"
 	"encoding/xml"
@@ -35,15 +35,43 @@ import (
 //go:embed assets/tsl_signed.xml
 var tslXML []byte
 
+// leavesFS : certificats feuilles publiés par chaque autorité (un bundle DER par
+// AC, nommé FRxx.der), pré-fetchés au build par scripts/fetch-2ddoc-leaves.sh.
+// Les vrais cachets sont signés par ces feuilles (ECDSA P-256), dont le
+// CommonName est l'identifiant de certificat de l'entête.
+//
+//go:embed assets/leaves
+var leavesFS embed.FS
+
 var (
 	certStoreOnce sync.Once
 	certStoreMu   sync.RWMutex
 	certStore     = map[string]map[string]*x509.Certificate{}
 )
 
-// ensureCertStore charge une fois les certificats de la TSL ANTS embarquée.
+// ensureCertStore charge une fois les certificats : feuilles embarquées (clé
+// (AC, CommonName)) puis certs d'AC de la TSL (repli). Tout est offline.
 func ensureCertStore() {
 	certStoreOnce.Do(func() {
+		// Feuilles : un bundle par autorité, l'AC vient du nom de fichier.
+		if entries, err := leavesFS.ReadDir("assets/leaves"); err == nil {
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				ac := strings.TrimSuffix(e.Name(), ".der")
+				data, err := leavesFS.ReadFile("assets/leaves/" + e.Name())
+				if err != nil {
+					continue
+				}
+				for _, c := range scanDERCerts(data) {
+					if cn := strings.TrimSpace(c.Subject.CommonName); cn != "" {
+						registerCert(ac, cn, c)
+					}
+				}
+			}
+		}
+		// Certs d'AC de la TSL, en repli.
 		for _, der := range extractTSLCerts(tslXML) {
 			c, err := x509.ParseCertificate(der)
 			if err != nil {
@@ -54,6 +82,30 @@ func ensureCertStore() {
 			}
 		}
 	})
+}
+
+// scanDERCerts extrait tous les certificats X509 d'un blob : bundles de DER
+// concaténés ou PKCS#7, en repérant les séquences ASN.1 (0x30 0x82 longueur).
+func scanDERCerts(data []byte) []*x509.Certificate {
+	var out []*x509.Certificate
+	for i := 0; i+4 < len(data); {
+		if data[i] != 0x30 || data[i+1] != 0x82 {
+			i++
+			continue
+		}
+		n := (int(data[i+2])<<8 | int(data[i+3])) + 4
+		if i+n > len(data) {
+			i++
+			continue
+		}
+		if c, err := x509.ParseCertificate(data[i : i+n]); err == nil {
+			out = append(out, c)
+			i += n
+			continue
+		}
+		i++
+	}
+	return out
 }
 
 // extractTSLCerts récupère tous les certificats X509 (DER) encodés en base64
