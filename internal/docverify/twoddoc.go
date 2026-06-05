@@ -16,10 +16,9 @@ import (
 // pour une facture qui en porte un, tout le pipeline lourd est court-circuité,
 // ce qui allège d'autant la charge du backend LLM.
 //
-// Périmètre : extraction des données — identité, adresse, date d'émission. La
-// signature ECDSA n'est pas vérifiée et ne le sera pas : on fait confiance au
-// contenu du cachet comme on fait confiance à l'OCR, et la vérification
-// anti-fraude via l'annuaire des certificats ANTS sort du périmètre de docverify.
+// Périmètre : extraction des données — identité, adresse, date d'émission — et
+// vérification de la signature (twoddoc_verify.go) contre la TSL ANTS embarquée.
+// Une signature vérifiée élève le niveau de confiance du verdict à « haut ».
 
 const (
 	ddocFieldSep = "\x1d" // GS : séparateur entre champs de données
@@ -49,6 +48,8 @@ type TwoDDoc struct {
 	EmitDate     time.Time // date d'émission (entête)
 	DataZone     string    // données brutes hors signature (champs séparés par GS)
 	HasSignature bool
+	SignedPayload string   // entête + données, octets effectivement signés (avant US)
+	Signature     string   // signature en base32 (après US)
 }
 
 // Decode2DDOC tente de lire un Datamatrix 2D-DOC dans le fichier via dmtxread
@@ -119,6 +120,8 @@ func Parse2DDOC(raw string) (*TwoDDoc, error) {
 	if i := strings.Index(body, ddocSigSep); i >= 0 {
 		doc.DataZone = body[:i]
 		doc.HasSignature = true
+		doc.SignedPayload = raw[:hlen+i] // entête + données, avant le séparateur US
+		doc.Signature = body[i+1:]       // signature base32 après le séparateur US
 	} else {
 		doc.DataZone = body
 	}
@@ -176,6 +179,12 @@ func AnalyzeFrom2DDOC(d *TwoDDoc, input Input) AnalysisResult {
 		surname:     input.Surname,
 		postalCodes: input.PostalCodes,
 	})
+	// Vérification de signature : authentifie le cachet. Une signature valide
+	// justifie le niveau de confiance « haut » ; sinon on reste à « moyen »
+	// (données lisibles mais non authentifiées cryptographiquement).
+	if ok, _ := VerifyDDOCSignature(d); ok {
+		a.SignatureVerified = true
+	}
 	a.source = srcTwoDDOC
 	a.Confidence = computeConfidence(a)
 	return a

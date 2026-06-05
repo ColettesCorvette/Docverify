@@ -39,7 +39,10 @@ type AnalysisResult struct {
 	// nul | bas | moyen | haut. Sert à Regia pour décider de l'automatisation :
 	// haut → auto, moyen/bas → confirmation manuelle, nul → rejet/review.
 	Confidence string   `json:"confidence,omitempty"`
-	Errors     []string `json:"errors,omitempty"`
+	// SignatureVerified : true si la signature 2D-DOC a été validée contre la
+	// TSL ANTS (anti-fraude). Renseigné uniquement sur le chemin 2D-DOC.
+	SignatureVerified bool     `json:"signature_verified,omitempty"`
+	Errors            []string `json:"errors,omitempty"`
 	RawText    string   `json:"raw_text,omitempty"`
 	// source trace le chemin qui a produit le résultat ; non sérialisé,
 	// renseigné par le pipeline pour calculer Confidence.
@@ -75,7 +78,12 @@ func computeConfidence(a AnalysisResult) string {
 	score := scoreAnalysis(a)
 	switch a.source {
 	case srcTwoDDOC:
-		return confHaut
+		// Données signées : « haut » seulement si la signature est vérifiée,
+		// sinon « moyen » (lisible mais non authentifié).
+		if a.SignatureVerified {
+			return confHaut
+		}
+		return confMoyen
 	case srcSegment:
 		return confBas
 	case srcLLM:

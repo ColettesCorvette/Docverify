@@ -175,21 +175,24 @@ func TestComputeConfidence(t *testing.T) {
 		name string
 		a    AnalysisResult
 		src  confidenceSource
+		sig  bool // signature 2D-DOC vérifiée
 		want string
 	}{
-		{"unreadable -> nul", AnalysisResult{Unreadable: true}, srcTesseract, confNul},
-		{"2D-DOC -> haut", rich, srcTwoDDOC, confHaut},
-		{"2D-DOC même pauvre -> haut", poor, srcTwoDDOC, confHaut},
-		{"Tesseract net -> haut", rich, srcTesseract, confHaut},
-		{"Tesseract pauvre -> bas", poor, srcTesseract, confBas},
-		{"LLM riche -> moyen (plafonné)", rich, srcLLM, confMoyen},
-		{"LLM pauvre -> bas", poor, srcLLM, confBas},
-		{"segmentation -> bas même riche", rich, srcSegment, confBas},
-		{"inconnu riche -> haut", rich, srcUnknown, confHaut},
+		{"unreadable -> nul", AnalysisResult{Unreadable: true}, srcTesseract, false, confNul},
+		{"2D-DOC signé vérifié -> haut", rich, srcTwoDDOC, true, confHaut},
+		{"2D-DOC non vérifié -> moyen", rich, srcTwoDDOC, false, confMoyen},
+		{"2D-DOC vérifié même pauvre -> haut", poor, srcTwoDDOC, true, confHaut},
+		{"Tesseract net -> haut", rich, srcTesseract, false, confHaut},
+		{"Tesseract pauvre -> bas", poor, srcTesseract, false, confBas},
+		{"LLM riche -> moyen (plafonné)", rich, srcLLM, false, confMoyen},
+		{"LLM pauvre -> bas", poor, srcLLM, false, confBas},
+		{"segmentation -> bas même riche", rich, srcSegment, false, confBas},
+		{"inconnu riche -> haut", rich, srcUnknown, false, confHaut},
 	}
 	for _, c := range cases {
 		a := c.a
 		a.source = c.src
+		a.SignatureVerified = c.sig
 		if got := computeConfidence(a); got != c.want {
 			t.Errorf("%s: got %q, want %q (score=%d)", c.name, got, c.want, scoreAnalysis(a))
 		}
