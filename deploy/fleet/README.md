@@ -63,14 +63,22 @@ Prerequis manuels, a faire une fois par Mac :
 
 ## Survie au reboot
 
-Verifie sur coupure de courant reelle le 2026-06-05 : auto-login + login item
-Docker Desktop + restart policy des conteneurs k3d remontent toute la stack sans
-intervention. Un seul ecueil corrige : k3d injecte host.k3d.internal dans CoreDNS
-a la creation du cluster, et un reboot brut ne rejoue pas cette injection, donc
-les pods ne joignaient plus le DMR hote, chaque requete tombait en 500. Corrige
-par `deploy/k8s/coredns-host-alias.yaml`, une ConfigMap persistee qui restaure le
-nom a chaque demarrage de CoreDNS. Appliquee automatiquement par le script de
-provisioning. C'est ce qui rend le noeud operationnel au reboot sans LaunchAgent.
+Verifie sur reboot reel de deux Macs le 2026-06-05 : auto-login + login item
+Docker Desktop + restart policy des conteneurs k3d remontent la stack sans
+intervention. Le piege etait le DNS du cluster. Au reboot, host.k3d.internal
+disparait de CoreDNS, et selon les Macs CoreDNS lui-meme ne redemarre pas, sa
+configmap perdant la cle NodeHosts, donc tout le DNS in-cluster tombe et chaque
+analyse renvoyait 500.
+
+Solution retenue : supprimer la dependance DNS du chemin LLM. Le deploiement
+pointe LLM_URL sur l'IP host-gateway fixe de Docker Desktop,
+http://192.168.65.254:12434/engines, au lieu de host.k3d.internal. docverify
+n'a besoin d'aucun autre service in-cluster, donc il reste operationnel au reboot
+meme si CoreDNS est mort, sans LaunchAgent. Valide bout en bout sur les deux Macs.
+
+Note : CoreDNS peut rester en echec apres reboot sur certains clusters k3d, bug
+connu de la cle NodeHosts. Ca n'affecte plus docverify, mais a surveiller si tu
+ajoutes des composants qui dependent du DNS in-cluster.
 
 Note mineure : un redemarrage en place de Docker Desktop, distinct d'un reboot
 complet, a deja fait perdre la publication du port API 6443 a k3d. Un reboot

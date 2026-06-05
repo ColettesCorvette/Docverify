@@ -75,11 +75,6 @@ else
 		--registry-create k3d-registry:0.0.0.0:5000
 fi
 
-step "4b. Resolution durable de host.k3d.internal (survie au reboot)"
-kubectl apply -f deploy/k8s/coredns-host-alias.yaml
-kubectl rollout restart deploy/coredns -n kube-system
-kubectl rollout status deploy/coredns -n kube-system --timeout=60s
-
 step "5. Build + import de l'image docverify"
 # Validation locale facultative : le Dockerfile multi-stage compile le binaire
 # dans l'image, donc Go n'est pas requis sur un Mac worker.

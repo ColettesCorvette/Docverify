@@ -22,11 +22,14 @@ spec:
         - containerPort: 8680
           name: http
         env:
-        # DMR tourne côté hôte (Docker Model Runner, Metal). Avec le TCP
-        # host-side activé dans Docker Desktop, les pods l'atteignent
-        # directement via host.k3d.internal:12434.
+        # DMR tourne côté hôte (Docker Model Runner, Metal). On vise l'IP
+        # host-gateway fixe de Docker Desktop plutôt que host.k3d.internal :
+        # ce nom est injecté dans CoreDNS à la création du cluster seulement et
+        # disparaît au reboot, et CoreDNS lui-même peut ne pas redémarrer. L'IP
+        # 192.168.65.254 est une constante Docker Desktop, identique sur tous
+        # les Macs, et supprime toute dépendance DNS du chemin LLM.
         - name: LLM_URL
-          value: "http://host.k3d.internal:12434/engines"
+          value: "http://192.168.65.254:12434/engines"
         - name: LLM_MODEL
           value: "docker.io/ai/gemma3:4B-Q4_K_M"
         # QUEUE_WORKERS borne le parallélisme par pod. Le total réel vaut
