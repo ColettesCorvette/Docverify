@@ -2,6 +2,7 @@ package docverify
 
 import (
 	"context"
+	"errors"
 	"log"
 	"os"
 	"strconv"
@@ -64,7 +65,7 @@ func NewQueue(workers int) *Queue {
 
 // Submit pousse un job dans la queue et bloque jusqu'au résultat. Le timeout
 // est découplé : queueTimeout (45s) max pour attendre dans la file d'attente,
-// et execTimeout (60s) max pour le traitement une fois pris par un worker.
+// et execTimeout (120s) max pour le traitement une fois pris par un worker.
 func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 	resultCh := make(chan JobResult, 1)
 	startCh := make(chan struct{})
@@ -123,10 +124,14 @@ func (q *Queue) runWorker(id int) {
 
 		log.Printf("[worker %d] traitement %s", id, item.job.FilePath)
 		
-		// Contexte d'exécution avec un timeout frais de 60 secondes
+		// Contexte d'exécution avec un timeout frais de 120 secondes
 		execCtx, execCancel := context.WithTimeout(item.ctx, execTimeout)
 		res := runPipeline(execCtx, item.job)
 		execCancel()
+
+		if res.Err != nil && errors.Is(res.Err, context.DeadlineExceeded) {
+			res.Err = errTimeout
+		}
 
 		// resultCh est buffered 1 : non bloquant même si Submit a déjà rendu
 		// la main suite à un timeout ou une annulation côté client.

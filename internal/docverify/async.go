@@ -180,10 +180,18 @@ func postCallback(callbackURL string, cb asyncCallback) {
 			log.Printf("[async %s] callback livré (%s → HTTP %d)", cb.JobID, cb.Status, resp.StatusCode)
 			return
 		}
+		
+		var errReason string
+		if err != nil {
+			errReason = err.Error()
+		} else if resp != nil {
+			errReason = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+
 		if resp != nil {
 			resp.Body.Close()
 		}
-		log.Printf("[async %s] callback tentative %d/2 échouée: %v", cb.JobID, attempt, err)
+		log.Printf("[async %s] callback tentative %d/2 échouée: %s", cb.JobID, attempt, errReason)
 		if attempt < 2 {
 			time.Sleep(time.Second)
 		}
