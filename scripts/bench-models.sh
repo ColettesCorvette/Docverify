@@ -25,7 +25,7 @@ if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 API="${API:-http://localhost:8680}"
 ROUTE="/api/v1/supporting-documents"
 SAMPLES="${SAMPLES:-$HOME/Desktop/LLM/ocr/samples}"
-MODEL="${MODEL:-huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0}"
+MODEL="${MODEL:-huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M}"
 
 # Vérité de terrain par sample : champs attendus pour mesurer la justesse.
 # Chaque ligne = sample|file|champs multipart à passer.

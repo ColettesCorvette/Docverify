@@ -56,7 +56,7 @@ func isImageMagickAvailable() bool {
 // llmDownscaleLimit borne la taille du fichier source au-delà de laquelle on
 // réduit la définition avant l'envoi au LLM. Un base64 trop lourd fait hang
 // le GPU Metal du backend LLM (observé en cluster sur des scans > 2 Mo).
-const llmDownscaleLimit = 2 * (1 << 20) // 2 Mo
+const llmDownscaleLimit = 1 * (1 << 20) // 1 Mo
 
 // preprocessForLLM prépare une image pour l'envoi au LLM vision.
 //
@@ -92,10 +92,10 @@ func preprocessForLLM(imagePath string) (string, func(), error) {
 	}
 	outPath := filepath.Join(tmpDir, "llm"+ext)
 
-	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 2000px avant LLM\n",
+	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 1280px avant LLM\n",
 		float64(info.Size())/(1<<20), llmDownscaleLimit>>20)
 
-	cmd := exec.Command("convert", imagePath, "-resize", "2000x2000>", outPath)
+	cmd := exec.Command("convert", imagePath, "-resize", "1280x1280>", outPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("   Downscale LLM échoué: %s\n", strings.TrimSpace(string(out)))
