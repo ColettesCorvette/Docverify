@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -30,6 +33,9 @@ func DefaultLLMURL() string {
 	if url := os.Getenv("LLM_URL"); url != "" {
 		return url
 	}
+	if detectedLLMURL != "" {
+		return detectedLLMURL
+	}
 	return "http://localhost:12434/engines"
 }
 
@@ -40,6 +46,9 @@ func DefaultModelName() string {
 	if m := os.Getenv("LLM_MODEL"); m != "" {
 		return m
 	}
+	if detectedModelName != "" {
+		return detectedModelName
+	}
 	return DefaultModel
 }
 
@@ -49,7 +58,7 @@ func DefaultModelName() string {
 // V1 sans AuthMiddleware ni RBAC : docverify est un service interne
 // appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
 func StartServer() {
-	InitLLMSemaphore()
+	InitLLM()
 
 	llmURL := DefaultLLMURL()
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -85,6 +94,10 @@ func StartServer() {
 			log.Printf("Erreur arret gracieux: %v", err)
 		}
 	}()
+
+	if regURL := os.Getenv("REGISTRY_URL"); regURL != "" {
+		go startHeartbeat(regURL, getLocalIP())
+	}
 
 	log.Printf("Serveur docverify sur :8680 (LLM=%s)", llmURL)
 	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
@@ -247,4 +260,47 @@ func handlePipelineError(w http.ResponseWriter, err error) {
 	default:
 		writeJSONError(w, http.StatusInternalServerError, "Erreur pipeline: "+err.Error())
 	}
+}
+
+// startHeartbeat envoie régulièrement (toutes les 30s) l'IP locale au registre.
+func startHeartbeat(registryURL, nodeIP string) {
+	log.Printf("[heartbeat] Démarrage du heartbeat vers le registre : %s (IP déclarée: %s)", registryURL, nodeIP)
+	client := &http.Client{Timeout: 5 * time.Second}
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	register := func() {
+		apiURL := fmt.Sprintf("%s/register?ip=%s", strings.TrimRight(registryURL, "/"), nodeIP)
+		resp, err := client.Post(apiURL, "application/json", nil)
+		if err != nil {
+			log.Printf("[heartbeat] Échec de l'auto-enregistrement : %v", err)
+			return
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("[heartbeat] Enregistrement rejeté par le registre : HTTP %d", resp.StatusCode)
+		}
+	}
+
+	// Premier enregistrement immédiat
+	register()
+
+	for range ticker.C {
+		register()
+	}
+}
+
+// getLocalIP retourne l'adresse IP externe du conteneur en inspectant NODE_IP
+// ou par déduction via une connexion UDP fictive.
+func getLocalIP() string {
+	if ip := os.Getenv("NODE_IP"); ip != "" {
+		return ip
+	}
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return "127.0.0.1"
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+	return localAddr.IP.String()
 }

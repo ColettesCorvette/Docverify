@@ -86,8 +86,13 @@ var llmHTTPClient = &http.Client{
 // par InitLLMSemaphore, appelé au démarrage du serveur.
 var llmSemaphore chan struct{}
 
+var (
+	detectedLLMURL    string
+	detectedModelName string
+)
+
 // InitLLMSemaphore crée le sémaphore qui borne les appels LLM concurrents.
-// La capacité est lue depuis LLM_MAX_CONCURRENT (défaut 2). Doit être appelé
+// La capacité est lue depuis LLM_MAX_CONCURRENT (défaut 4). Doit être appelé
 // une fois, avant tout appel à RunLLM.
 func InitLLMSemaphore() {
 	n := 4
@@ -98,6 +103,67 @@ func InitLLMSemaphore() {
 	}
 	llmSemaphore = make(chan struct{}, n)
 	log.Printf("Sémaphore LLM : max %d inférences concurrentes", n)
+}
+
+// InitLLM initialise le sémaphore LLM et auto-détecte le backend LLM si nécessaire.
+func InitLLM() {
+	InitLLMSemaphore()
+
+	// Si LLM_URL et LLM_MODEL sont tous deux définis dans l'environnement, pas besoin d'auto-détection.
+	if os.Getenv("LLM_URL") != "" && os.Getenv("LLM_MODEL") != "" {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	candidates := []string{
+		"http://192.168.65.254:12434/engines",   // Docker Desktop host-gateway (Mac)
+		"http://host.lima.internal:12434/engines", // VM Lima k3s (Mac VM)
+		"http://localhost:12434/engines",        // DMR local (Mac host)
+		"http://localhost:8000",                 // vLLM local (Linux host/hostNetwork)
+		"http://vllm:8000",                      // Service vLLM K8s (Linux)
+	}
+
+	// Si LLM_URL est défini, c'est l'unique candidat à tester pour le modèle
+	if url := os.Getenv("LLM_URL"); url != "" {
+		candidates = []string{url}
+	}
+
+	client := &http.Client{Timeout: 500 * time.Millisecond}
+
+	for _, baseURL := range candidates {
+		url := strings.TrimRight(baseURL, "/") + "/v1/models"
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusOK {
+			detectedLLMURL = baseURL
+			log.Printf("[llm-detect] Backend LLM détecté : %s", baseURL)
+
+			var modelResp struct {
+				Data []struct {
+					ID string `json:"id"`
+				} `json:"data"`
+			}
+			if bodyBytes, rerr := io.ReadAll(resp.Body); rerr == nil {
+				if merr := json.Unmarshal(bodyBytes, &modelResp); merr == nil && len(modelResp.Data) > 0 {
+					detectedModelName = modelResp.Data[0].ID
+					log.Printf("[llm-detect] Modèle actif détecté : %s", detectedModelName)
+				}
+			}
+			return
+		}
+	}
+
+	log.Printf("[llm-detect] Aucun backend LLM actif détecté. Fallbacks par défaut utilisés.")
 }
 
 // Anti-contamination : aucun nonce dans le prompt. Le backend est désormais
