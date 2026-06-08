@@ -43,9 +43,16 @@ nature pour un VLM 7B, cf. le bench DMR CPU vs Metal.
 4. `kubectl apply -f deploy/llm/vllm-deployment.yaml`, puis pointer
    `LLM_URL=http://vllm:8000/v1` côté docverify.
 
-Le modèle `Qwen/Qwen2.5-VL-7B-Instruct` est téléchargé depuis Hugging Face au
-démarrage. Pour un modèle gated, fournir `HF_TOKEN` via un Secret. Prévoir un
-volume persistant pour le cache si l'on ne veut pas re-télécharger à chaque pod.
+Le modèle `google/gemma-4-e4b-it` est téléchargé depuis Hugging Face au
+démarrage : c'est le Gemma 4 E4B servi par DMR sur les Macs, ici en modèle HF
+complet plutôt qu'en GGUF Q8 (vLLM sert nativement les modèles HF, vision
+incluse). Gemma est gated : fournir `HF_TOKEN` via un Secret après acceptation
+de la licence sur Hugging Face. Prévoir un volume persistant pour le cache si
+l'on ne veut pas re-télécharger à chaque pod.
+
+À VALIDER : le bench groundtruth (100 % avec le GGUF Q8 sous DMR) n'a pas encore
+été rejoué avec ce modèle HF complet servi par vLLM sur une machine GPU. Le
+relancer avant de mettre cette voie en production.
 
 ## Référence
 

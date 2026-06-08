@@ -41,7 +41,7 @@ Une requête suit le chemin : Regia → pod docverify → Docker Model Runner su
 | Projet | Rôle |
 |---|---|
 | [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un modèle GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
-| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage servi par défaut, empaqueté `hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0` |
+| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage servi par défaut, empaqueté `hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M` |
 | [k3d](https://k3d.io) | k3s en conteneurs Docker pour le cluster local |
 
 ## Développer et tester en local
@@ -68,7 +68,7 @@ La route, ses champs et le mode webhook sont décrits dans le wiki, page [API HT
 Le backend LLM est Docker Model Runner, activé dans Docker Desktop avec le support TCP host-side. On récupère le modèle une fois, puis le déploiement tient en un manifeste et un script.
 
 ```bash
-docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0   # backend LLM, une fois
+docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une fois
 kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et ses replicas
 ./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
 ```
@@ -94,6 +94,8 @@ Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. 
 | `concurrency-test.sh` | Rafale parallèle, garde anti-régression de la contamination |
 | `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring contre le groundtruth |
 | `redeploy.sh` | Rebuild image, import k3d et rollout docverify |
+| `monitor-fleet.sh` | [NOUVEAU] Monitor de santé HTTP de tous les nœuds de la flotte |
+| `deploy-fleet.sh` | [NOUVEAU] Script pour automatiser les déploiements Git+Redeploy à distance via SSH |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
 
 Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh` ; elles remplacent l'ancien `gen-llm-backend.sh`, conservé mais obsolète.
@@ -102,6 +104,8 @@ Le détail de chaque script et de sa configuration est sur la page [Scripts](htt
 
 ## Machines
 
-Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM sur plusieurs backends.
+Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM en shared-nothing (un nœud k3d autonome + DMR local par machine).
 
-La mise à l'échelle multi-Mac évolue vers un vrai cluster Kubernetes à plusieurs nœuds : chaque Mac héberge un nœud k3s dans une VM Linux légère bridgée sur le LAN, les nœuds rejoignent automatiquement le serveur par token, et le DMR Metal reste host-natif sur chaque Mac. Cette approche a été validée en spike sur deux Macs ; son industrialisation est en cours. Une machine Linux à GPU peut rejoindre le même cluster nativement, sans VM, et y servir le LLM via vLLM. Le déploiement de production reste pour l'instant un k3d autonome par Mac.
+Pour s'adapter aux Mac workers de 24 Go de RAM, le modèle vision-langage de production est quantisé en `Q4_K_M` (4.62 GiB), ce qui libère 3 Go de VRAM par nœud tout en conservant une justesse de 100% au benchmark. Le système supporte les rafales de charge intense (ex: 12 requêtes simultanées) sans crash ni timeout grâce au découplage du cycle de vie des tâches (timeout d'attente court en file et timeout d'exécution garanti pour le worker).
+
+La mise à l'échelle vers un vrai cluster Kubernetes multi-nœuds (lima + k3s) a été scriptée et validée (Chemin A) mais est conservée en option pour éviter la perte de 4 Go de RAM par VM Linux sur les workers de 24 Go. Le déploiement par défaut reste la topologie shared-nothing orchestrée à distance par les scripts d'administration.
