@@ -37,9 +37,11 @@ spec:
         - name: LLM_URL
           value: "http://host.lima.internal:12434/engines"
         - name: LLM_MODEL
-          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0"
+          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
         - name: QUEUE_WORKERS
-          value: "5"
+          value: "3"
+        - name: LLM_MAX_CONCURRENT
+          value: "3"
         livenessProbe:
           httpGet:
             path: /health
@@ -56,6 +58,9 @@ spec:
           requests:
             cpu: "500m"
             memory: "512Mi"
+          limits:
+            cpu: "2000m"
+            memory: "1Gi"
 ---
 # Service in-cluster. En hostNetwork, chaque nœud est aussi joignable
 # directement sur son IP LAN :8680 ; ce Service sert la découverte interne.

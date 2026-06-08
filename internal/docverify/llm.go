@@ -12,11 +12,12 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
 
-const DefaultModel = "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0"
+const DefaultModel = "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
 
 // --- Format OpenAI-compatible, via /v1 (Docker Model Runner, vLLM, etc.) ---
 
@@ -79,6 +80,26 @@ var llmHTTPClient = &http.Client{
 	},
 }
 
+// llmSemaphore borne le nombre d'inférences LLM concurrentes. Sans cette
+// limite, N workers x M étapes du pipeline peuvent submerger le backend DMR
+// (llama.cpp GPU Metal), qui n'a pas de queue élastique interne. Initialisé
+// par InitLLMSemaphore, appelé au démarrage du serveur.
+var llmSemaphore chan struct{}
+
+// InitLLMSemaphore crée le sémaphore qui borne les appels LLM concurrents.
+// La capacité est lue depuis LLM_MAX_CONCURRENT (défaut 2). Doit être appelé
+// une fois, avant tout appel à RunLLM.
+func InitLLMSemaphore() {
+	n := 4
+	if v := os.Getenv("LLM_MAX_CONCURRENT"); v != "" {
+		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
+			n = parsed
+		}
+	}
+	llmSemaphore = make(chan struct{}, n)
+	log.Printf("Sémaphore LLM : max %d inférences concurrentes", n)
+}
+
 // Anti-contamination : aucun nonce dans le prompt. Le backend est désormais
 // Docker Model Runner (llama.cpp), différent moteur que l'ancien vllm-mlx.
 // Garde-fou conservé : `concurrency-test.sh` vérifie sous rafale qu'aucune
@@ -92,9 +113,13 @@ var llmHTTPClient = &http.Client{
 // pour transcrire l'image fournie. Le contexte propage l'annulation côté
 // client HTTP et le timeout global du job.
 func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error) {
-	if err := pingLLM(ctx, llmURL); err != nil {
-		return "", fmt.Errorf("Endpoint LLM non joignable (%s): %w\n"+
-			"  → Vérifiez : curl %s/v1/models", llmURL, err, llmURL)
+	if llmSemaphore != nil {
+		select {
+		case llmSemaphore <- struct{}{}:
+			defer func() { <-llmSemaphore }()
+		case <-ctx.Done():
+			return "", fmt.Errorf("annulé en attente du sémaphore LLM: %w", ctx.Err())
+		}
 	}
 
 	processedPath, cleanup, _ := preprocessForLLM(imagePath)
@@ -124,7 +149,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
-		MaxTokens:        1000,
+		MaxTokens:        700,
 		Temperature:      0,
 		Stream:           false,
 		FrequencyPenalty: 0.3,
@@ -193,7 +218,12 @@ func postLLMWithRetry(ctx context.Context, apiURL string, body []byte) (*http.Re
 	if ctx.Err() != nil || !isRetryableLLMErr(err) {
 		return nil, err
 	}
-	log.Printf("LLM erreur transient (%v) — retry une fois", err)
+	log.Printf("LLM erreur transient (%v) — retry dans 500ms", err)
+	select {
+	case <-time.After(500 * time.Millisecond):
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 	return doLLMPost(ctx, apiURL, body)
 }
 
@@ -223,10 +253,10 @@ func isRetryableLLMErr(err error) bool {
 		strings.Contains(msg, "use of closed network connection")
 }
 
-// pingLLM vérifie que l'endpoint LLM répond sur /v1/models. Hérite du
-// contexte parent pour pouvoir être interrompu si le client HTTP raccroche
-// avant même que le LLM ne soit sollicité.
-func pingLLM(ctx context.Context, llmURL string) error {
+// PingLLM vérifie que l'endpoint LLM répond sur /v1/models. Exporté pour
+// être utilisé au démarrage du serveur et dans le health check enrichi.
+// N'est plus appelé à chaque requête RunLLM pour éviter de surcharger le DMR.
+func PingLLM(ctx context.Context, llmURL string) error {
 	// 15 s (et non 5 s) pour tolérer un démarrage à froid du backend : juste
 	// après un démarrage, le serveur met quelques secondes à répondre sur
 	// /v1/models, et un ping trop court renvoyait un faux « endpoint injoignable ».
