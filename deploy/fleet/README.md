@@ -2,7 +2,7 @@
 
 Architecture de mise a l'echelle sur plusieurs Macs, actee apres le bench DMR
 CPU vs Metal du 2026-06-05 : un pod DMR conteneurise tombe en CPU et depasse le
-jobTimeout de 90s sous rafale, donc le GPU Metal reste host-native.
+délai d'exécution sous rafale, donc le GPU Metal reste host-native.
 
 ## Principe
 
@@ -22,9 +22,9 @@ Regia ─► LB de flotte ─────┤                        127.0.0.1:12
 - Aucun appel LLM ne traverse le LAN : chaque docverify parle a son DMR local
   via `host.k3d.internal:12434`. DMR reste sur `127.0.0.1`, pas d'exposition.
 - Le LB ne repartit que le trafic HTTP entrant sur les `:8680` publies par k3d.
-- Mise a l'echelle = ajouter un Mac et une ligne `to` dans le `Caddyfile`.
+- **Mise a l'echelle dynamique** : Les nœuds (Macs et Linux) s'auto-enregistrent dynamiquement auprès du registre central (inclus dans `./docverify --registry`) qui gère et actualise à chaud les backends du `Caddyfile` de flotte sans modification manuelle.
 - Tolerance de panne : le health-check `/health` ejecte un Mac dont docverify ou
-  le DMR local est tombe. Pas de point de calcul partage a saturer.
+  le DMR local est tombe. Le registre central nettoie périodiquement (toutes les 90s) les nœuds inactifs.
 
 ## Mettre en service un Mac
 
@@ -35,9 +35,9 @@ Sur chaque Mac, depuis la racine du repo :
 ```
 
 Le script installe k3d si absent dans ~/.local/bin sans sudo, gate l'activation
-TCP de DMR sur sa joignabilite reelle, precharge le modele, cree le cluster k3d,
-build et deploie docverify, applique le fix CoreDNS, puis verifie `/health`. Il
-affiche l'IP LAN a reporter dans le `Caddyfile`.
+TCP de DMR sur sa joignabilité réelle, précharge le modèle, crée le cluster k3d,
+build et déploie docverify, applique le fix CoreDNS, puis vérifie `/health`.
+Les conteneurs `docverify` lancés s'enregistrent automatiquement auprès du registre central configuré par la variable d'environnement `REGISTRY_URL`.
 
 Outils requis sur le Mac : Docker Desktop seul suffit, il fournit docker et
 kubectl. k3d est installe par le script. Go n'est pas requis, le binaire est
@@ -85,16 +85,34 @@ complet, a deja fait perdre la publication du port API 6443 a k3d. Un reboot
 complet l'a republie correctement. Si kubectl devient injoignable hors reboot,
 `k3d cluster start mini-cluster` republie le mapping.
 
-## Lancer le LB
+## Lancer le Registre et le Load Balancer Caddy
 
-Reporter les IP des Macs dans `Caddyfile`, puis sur le Mac principal :
+Le Load Balancer Caddy est configuré dynamiquement par le registre de flotte.
 
-```bash
-docker run -d --name docverify-lb -p 8680:8680 \
-  -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
-```
+1. **Démarrer le registre sécurisé** (sur le nœud principal / LB) :
+   ```bash
+   DOCVERIFY_REGISTRY_TOKEN="votre_secret_token" ./docverify --registry 8681
+   ```
 
-Regia pointe alors sur `http://<mac-principal>:8680`.
+   Ce service écoute sur le port `:8681` et se charge de réécrire le fichier `deploy/fleet/Caddyfile` à partir du template `deploy/fleet/Caddyfile.template` à chaque auto-enregistrement de nœud.
+
+2. **Démarrer Caddy** (sur le nœud principal / LB) :
+   ```bash
+   caddy run --config deploy/fleet/Caddyfile
+   # ou via Docker :
+   docker run -d --name docverify-lb --network host \
+     -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
+   ```
+
+   Caddy rechargera sa configuration automatiquement à chaque modification du fichier généré par le registre.
+
+3. **Variables d'environnement du registre** :
+   Les variables suivantes permettent de configurer le registre et le client d'enregistrement :
+   - `REGISTRY_URL` : URL du registre à contacter par le client heartbeat (ex: `http://192.168.40.10:8681`).
+   - `NODE_IP` : IP locale du nœud à déclarer au registre.
+   - `DOCVERIFY_REGISTRY_TOKEN` : Clé secrète partagée optionnelle pour authentifier l'enregistrement (rejet HTTP 401 si invalide).
+   - `DOCVERIFY_CADDY_TEMPLATE` : Chemin vers le template Caddyfile (défaut: `deploy/fleet/Caddyfile.template`).
+   - `DOCVERIFY_CADDY_OUTPUT` : Chemin vers le Caddyfile de sortie (défaut: `deploy/fleet/Caddyfile`).
 
 ## Reglage de la concurrence
 
