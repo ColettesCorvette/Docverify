@@ -31,7 +31,7 @@ spec:
         - name: LLM_URL
           value: "http://192.168.65.254:12434/engines"
         - name: LLM_MODEL
-          value: "docker.io/ai/gemma3:4B-Q4_K_M"
+          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0"
         # QUEUE_WORKERS borne le parallélisme par pod. Le total réel vaut
         # replicas x QUEUE_WORKERS et doit rester proche de la capacité LLM
         # cumulée, soit nb_de_Macs x 5 places de --max-num-seqs. Un seul Mac :

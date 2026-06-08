@@ -37,7 +37,7 @@ spec:
         - name: LLM_URL
           value: "http://host.lima.internal:12434/engines"
         - name: LLM_MODEL
-          value: "docker.io/ai/gemma3:4B-Q4_K_M"
+          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0"
         - name: QUEUE_WORKERS
           value: "5"
         livenessProbe:

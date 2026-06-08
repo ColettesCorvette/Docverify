@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const DefaultModel = "docker.io/ai/gemma3:4B-Q4_K_M"
+const DefaultModel = "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0"
 
 // --- Format OpenAI-compatible, via /v1 (Docker Model Runner, vLLM, etc.) ---
 
@@ -41,6 +41,11 @@ type chatRequest struct {
 	MaxTokens   int           `json:"max_tokens"`
 	Temperature float64       `json:"temperature"`
 	Stream      bool          `json:"stream"`
+	// ChatTemplateKwargs désactive le mode raisonnement des modèles qui en ont
+	// un, comme Gemma 4. Sans ça ils consomment tous les tokens en réflexion et
+	// renvoient un content vide. Ignoré sans effet par les modèles non concernés
+	// comme Gemma 3. Tâche OCR : on veut la transcription, pas du raisonnement.
+	ChatTemplateKwargs map[string]any `json:"chat_template_kwargs,omitempty"`
 }
 
 type chatResponse struct {
@@ -114,6 +119,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 		MaxTokens:   1000,
 		Temperature: 0,
 		Stream:      false,
+		ChatTemplateKwargs: map[string]any{"enable_thinking": false},
 	}
 
 	body, err := json.Marshal(payload)

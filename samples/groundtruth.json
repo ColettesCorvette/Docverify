@@ -1,8 +1,8 @@
 {
   "_meta": {
-    "version": "2026-06-04",
+    "version": "2026-06-08",
     "samples_dir": "/Users/dev/Desktop/LLM/ocr/samples",
-    "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, expiration des pièces d'identité, etc.). 2026-06-04 : cni8493 et solange passés à ok:false car les pièces sont périmées (un justificatif périmé doit être rejeté) ; auparavant ok:true à tort. Compléter les dates au fil des inspections manuelles."
+    "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, expiration des pièces d'identité, etc.). 2026-06-08 : ANNULATION des 'corrections' du 2026-06-04 sur cni8493 et solange — elles étaient fausses (dates de délivrance confondues avec l'expiration). Les deux pièces sont VALIDES (cni8493 expire 22/09/2026, solange 31/05/2030), donc ok:true. Vérifié sur les images avec le user. Le modèle qui lit correctement les deux dates et retient l'expiration la plus tardive est le bon."
   },
   "samples": {
     "edf": {
@@ -79,10 +79,13 @@
         "doc_type": "passeport",
         "name_found": true,
         "date_found": true,
-        "ok": false,
+        "expiry_date": "22/09/2026",
+        "issue_date": "22/09/2021",
+        "birth_date": "14/05/2011",
+        "ok": true,
         "unreadable": false
       },
-      "notes": "Passeport marocain BEN AMAR, expiration 22/09/2021 → périmé → ok:false légitime (corrigé le 2026-06-04 ; auparavant ok:true à tort, ce qui pénalisait les modèles détectant l'expiration). Sample qui timeoute sur Qwen-32B (GPU hang Metal). Idéal pour tester la robustesse multi-modèles."
+      "notes": "Passeport marocain BEN AMAR LEILA, née le 14/05/2011, délivrance 22/09/2021, expiration 22/09/2026 → valide → ok:true. CORRECTION 2026-06-08 : la 'correction' du 2026-06-04 (expiration 22/09/2021 → ok:false) était FAUSSE ; 22/09/2021 est la date de délivrance, 22/09/2026 l'expiration (vérifié sur l'image avec le user). Le bon modèle lit les deux dates et classe l'expiration la plus tardive. Sample qui timeoute sur Qwen-32B (GPU hang Metal). Idéal pour tester la robustesse multi-modèles."
     },
     "cni8498": {
       "file": "index_8498_1_1200.png",
@@ -145,10 +148,13 @@
         "name_found": true,
         "surname_found": true,
         "date_found": true,
-        "ok": false,
+        "expiry_date": "31/05/2030",
+        "issue_date": "01/06/2015",
+        "birth_date": "03/07/1962",
+        "ok": true,
         "unreadable": false
       },
-      "notes": "CNI française biométrique N&B recto+verso sur la même page (2480x3508, 2.6 Mo). Identité : DURAND SOLANGE GERMAINE, nom d'usage BEUR, née le 03/07/1962, expiration 01/06/2020 → périmée → ok:false légitime (corrigé le 2026-06-04). La passe Tesseract initiale extrait du contenu utile mais bruité (date OCRisée 91.09:1959, MRZ TD1 à 35 chars au lieu de 30). Inputs corrigés le 2026-05-27 pour refléter le doc : SOLANGE est prénom, pas nom."
+      "notes": "CNI française biométrique N&B recto+verso sur la même page (2480x3508, 2.6 Mo). Identité : DURAND SOLANGE, née le 03/07/1962, délivrance 01/06/2015, validité jusqu'au 31/05/2030 → valide → ok:true (vérifié avec le user le 2026-06-08). CORRECTION 2026-06-08 : la 'correction' du 2026-06-04 (expiration 01/06/2020 → ok:false) était FAUSSE ; la carte est valide 15 ans (CNI française post-2014). La passe Tesseract initiale extrait du contenu utile mais bruité (date OCRisée 91.09:1959, MRZ TD1 à 35 chars au lieu de 30). Inputs corrigés le 2026-05-27 pour refléter le doc : SOLANGE est prénom, pas nom."
     },
     "impot": {
       "file": "impot_exemple.pdf",

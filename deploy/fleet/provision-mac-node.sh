@@ -20,13 +20,13 @@
 #     tout eteint. FileVault rend l'auto-login inoperant. Voir README.md.
 #
 # Variables d'env :
-#   MODEL    modele DMR a precharger      defaut docker.io/ai/gemma3:4B-Q4_K_M
+#   MODEL    modele DMR a precharger      defaut hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0
 #   CLUSTER  nom du cluster k3d            defaut mini-cluster
 #   IMAGE    tag image docverify           defaut docverify-docverify:latest
 
 set -euo pipefail
 
-MODEL="${MODEL:-ai/gemma3:4B-Q4_K_M}"
+MODEL="${MODEL:-hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0}"
 CLUSTER="${CLUSTER:-mini-cluster}"
 IMAGE="${IMAGE:-docverify-docverify:latest}"
 
