@@ -28,8 +28,14 @@ func StartRegistry(port string) {
 		port = ":" + port
 	}
 
-	templatePath := "deploy/fleet/Caddyfile.template"
-	outputPath := "deploy/fleet/Caddyfile"
+	templatePath := os.Getenv("DOCVERIFY_CADDY_TEMPLATE")
+	if templatePath == "" {
+		templatePath = "deploy/fleet/Caddyfile.template"
+	}
+	outputPath := os.Getenv("DOCVERIFY_CADDY_OUTPUT")
+	if outputPath == "" {
+		outputPath = "deploy/fleet/Caddyfile"
+	}
 
 	// Vérification de base des chemins
 	if _, err := os.Stat(templatePath); err != nil {
@@ -51,12 +57,19 @@ func StartRegistry(port string) {
 					changed = true
 				}
 			}
+			var ips []string
 			if changed {
-				if err := regenerateCaddyfile(templatePath, outputPath); err != nil {
-					log.Printf("[registry] Échec de la mise à jour Caddyfile : %v", err)
+				for ip := range activeNodes {
+					ips = append(ips, ip)
 				}
 			}
 			nodesMutex.Unlock()
+
+			if changed {
+				if err := regenerateCaddyfile(templatePath, outputPath, ips); err != nil {
+					log.Printf("[registry] Échec de la mise à jour Caddyfile : %v", err)
+				}
+			}
 		}
 	}()
 
@@ -68,7 +81,17 @@ func StartRegistry(port string) {
 }
 
 func handleRegister(templatePath, outputPath string) http.HandlerFunc {
+	token := os.Getenv("DOCVERIFY_REGISTRY_TOKEN")
+
 	return func(w http.ResponseWriter, r *http.Request) {
+		if token != "" {
+			clientToken := r.FormValue("token")
+			if clientToken != token {
+				http.Error(w, "Non autorisé", http.StatusUnauthorized)
+				return
+			}
+		}
+
 		ip := r.FormValue("ip")
 		if ip == "" {
 			http.Error(w, "Paramètre 'ip' manquant", http.StatusBadRequest)
@@ -77,22 +100,32 @@ func handleRegister(templatePath, outputPath string) http.HandlerFunc {
 		ip = strings.TrimSpace(ip)
 
 		nodesMutex.Lock()
-		defer nodesMutex.Unlock()
-
 		node, exists := activeNodes[ip]
+		changed := false
 		if !exists {
 			log.Printf("[registry] Nouveau nœud s'invite dans la flotte : %s", ip)
 			activeNodes[ip] = &nodeInfo{
 				IP:         ip,
 				LastSeenAt: time.Now(),
 			}
-			if err := regenerateCaddyfile(templatePath, outputPath); err != nil {
+			changed = true
+		} else {
+			node.LastSeenAt = time.Now()
+		}
+		var ips []string
+		if changed {
+			for activeIP := range activeNodes {
+				ips = append(ips, activeIP)
+			}
+		}
+		nodesMutex.Unlock()
+
+		if changed {
+			if err := regenerateCaddyfile(templatePath, outputPath, ips); err != nil {
 				log.Printf("[registry] Échec de la mise à jour Caddyfile : %v", err)
 				http.Error(w, "Erreur régénération Caddyfile", http.StatusInternalServerError)
 				return
 			}
-		} else {
-			node.LastSeenAt = time.Now()
 		}
 
 		w.WriteHeader(http.StatusOK)
@@ -100,14 +133,14 @@ func handleRegister(templatePath, outputPath string) http.HandlerFunc {
 	}
 }
 
-func regenerateCaddyfile(templatePath, outputPath string) error {
+func regenerateCaddyfile(templatePath, outputPath string, ips []string) error {
 	data, err := os.ReadFile(templatePath)
 	if err != nil {
 		return fmt.Errorf("lecture template %s : %w", templatePath, err)
 	}
 
 	var upstreams []string
-	for ip := range activeNodes {
+	for _, ip := range ips {
 		upstreams = append(upstreams, fmt.Sprintf("to %s:8680", ip))
 	}
 
@@ -127,7 +160,7 @@ func regenerateCaddyfile(templatePath, outputPath string) error {
 		return fmt.Errorf("ecriture Caddyfile %s : %w", outputPath, err)
 	}
 
-	log.Printf("[registry] Caddyfile actualisé avec %d nœud(s). Rechargement de Caddy...", len(activeNodes))
+	log.Printf("[registry] Caddyfile actualisé avec %d nœud(s). Rechargement de Caddy...", len(ips))
 
 	// Exécuter la commande caddy reload
 	cmd := exec.Command("caddy", "reload", "--config", outputPath)

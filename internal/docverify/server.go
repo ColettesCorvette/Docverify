@@ -9,6 +9,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -269,8 +270,13 @@ func startHeartbeat(registryURL, nodeIP string) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 
+	token := os.Getenv("DOCVERIFY_REGISTRY_TOKEN")
+
 	register := func() {
 		apiURL := fmt.Sprintf("%s/register?ip=%s", strings.TrimRight(registryURL, "/"), nodeIP)
+		if token != "" {
+			apiURL += fmt.Sprintf("&token=%s", url.QueryEscape(token))
+		}
 		resp, err := client.Post(apiURL, "application/json", nil)
 		if err != nil {
 			log.Printf("[heartbeat] Échec de l'auto-enregistrement : %v", err)
