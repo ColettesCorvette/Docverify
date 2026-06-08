@@ -20,13 +20,13 @@
 #     tout eteint. FileVault rend l'auto-login inoperant. Voir README.md.
 #
 # Variables d'env :
-#   MODEL    modele DMR a precharger      defaut hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0
+#   MODEL    modele DMR a precharger      defaut hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M
 #   CLUSTER  nom du cluster k3d            defaut mini-cluster
 #   IMAGE    tag image docverify           defaut docverify-docverify:latest
 
 set -euo pipefail
 
-MODEL="${MODEL:-hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0}"
+MODEL="${MODEL:-hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M}"
 CLUSTER="${CLUSTER:-mini-cluster}"
 IMAGE="${IMAGE:-docverify-docverify:latest}"
 

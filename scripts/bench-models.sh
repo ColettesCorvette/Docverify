@@ -5,7 +5,7 @@
 # capture la réponse. Sortie : JSON lignes (un objet par sample) sur stdout.
 #
 # Usage :
-#   MODEL=huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q8_0 ./scripts/bench-models.sh > /tmp/bench-gemma4.jsonl
+#   MODEL=huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M ./scripts/bench-models.sh > /tmp/bench-gemma4.jsonl
 #   
 #
 # Comparer ensuite :
