@@ -21,7 +21,6 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /docverify .
-COPY *.json ./
 
 EXPOSE 8680
 ENTRYPOINT ["/usr/local/app/docverify"]

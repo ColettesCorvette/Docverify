@@ -19,6 +19,8 @@ func main() {
 		return
 	}
 
+	dc.InitLLMSemaphore()
+
 	data, err := readArg(os.Args[1])
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Erreur lecture input: %v\n", err)
