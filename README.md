@@ -16,7 +16,7 @@ Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si
 
 Le verdict porte un niveau de confiance à quatre paliers, de `nul` à `haut`, qui reflète le chemin ayant produit le résultat : un 2D-DOC à signature vérifiée ou un OCR net donnent `haut`, le LLM plafonne à `moyen`, une rescousse par segmentation reste `bas`, un document illisible est `nul`. Regia s'en sert pour décider de l'automatisation : `haut` passe seul, `moyen` ou `bas` demandent une confirmation manuelle, `nul` est rejeté.
 
-Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma3-4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via `host.k3d.internal`. Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
+Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 4 E4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via `host.k3d.internal`. Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
 
 ## Architecture
 
@@ -30,18 +30,18 @@ Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma3
 │    └─ Docker Model Runner  ◄──────────────────────────┘             │
 │              │ llama.cpp · GPU Metal · process hôte                 │
 │              ▼                                                      │
-│         Gemma3-4B (GGUF)                                            │
+│         Gemma 4 E4B (GGUF)                                          │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-Une requête suit le chemin : Regia → pod docverify → Docker Model Runner sur l'hôte → Gemma3-4B.
+Une requête suit le chemin : Regia → pod docverify → Docker Model Runner sur l'hôte → Gemma 4 E4B.
 
 ## Briques externes
 
 | Projet | Rôle |
 |---|---|
 | [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un modèle GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
-| [Gemma 3 4B](https://huggingface.co/google/gemma-3-4b-it) | Modèle vision-langage servi par défaut, empaqueté `ai/gemma3:4B-Q4_K_M` |
+| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage servi par défaut, empaqueté `hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0` |
 | [k3d](https://k3d.io) | k3s en conteneurs Docker pour le cluster local |
 
 ## Développer et tester en local
@@ -68,7 +68,7 @@ La route, ses champs et le mode webhook sont décrits dans le wiki, page [API HT
 Le backend LLM est Docker Model Runner, activé dans Docker Desktop avec le support TCP host-side. On récupère le modèle une fois, puis le déploiement tient en un manifeste et un script.
 
 ```bash
-docker model pull ai/gemma3:4B-Q4_K_M                  # backend LLM, une fois
+docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q8_0   # backend LLM, une fois
 kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et ses replicas
 ./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
 ```

@@ -41,6 +41,14 @@ type chatRequest struct {
 	MaxTokens   int           `json:"max_tokens"`
 	Temperature float64       `json:"temperature"`
 	Stream      bool          `json:"stream"`
+	// FrequencyPenalty pénalise un token proportionnellement au nombre de fois
+	// où il est déjà apparu. Sans ça, Gemma 4 part en boucle sur le remplissage
+	// `<` des MRZ et brûle tout le budget de tokens avant d'atteindre le verso
+	// d'une pièce d'identité, où se trouve la date d'expiration. Observé sur le
+	// sample solange. 0.3 suffit à casser la boucle sans dégrader les autres
+	// transcriptions ; à 1.0 le modèle altère des chiffres de date. Paramètre
+	// standard OpenAI, honoré par llama.cpp comme par vLLM.
+	FrequencyPenalty float64 `json:"frequency_penalty,omitempty"`
 	// ChatTemplateKwargs désactive le mode raisonnement des modèles qui en ont
 	// un, comme Gemma 4. Sans ça ils consomment tous les tokens en réflexion et
 	// renvoient un content vide. Ignoré sans effet par les modèles non concernés
@@ -116,9 +124,10 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
-		MaxTokens:   1000,
-		Temperature: 0,
-		Stream:      false,
+		MaxTokens:        1000,
+		Temperature:      0,
+		Stream:           false,
+		FrequencyPenalty: 0.3,
 		ChatTemplateKwargs: map[string]any{"enable_thinking": false},
 	}
 
