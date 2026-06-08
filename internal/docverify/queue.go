@@ -11,7 +11,8 @@ import (
 const (
 	defaultWorkers = 5
 	jobBufferSize  = 100
-	jobTimeout     = 90 * time.Second
+	queueTimeout   = 45 * time.Second
+	execTimeout    = 120 * time.Second
 	enqueueTimeout = 5 * time.Second
 )
 
@@ -37,6 +38,8 @@ type queueItem struct {
 	ctx      context.Context
 	job      Job
 	resultCh chan JobResult
+	queueCtx context.Context
+	startCh  chan struct{}
 }
 
 // Queue est un broker in-process : un channel bufferisé alimenté par le
@@ -59,12 +62,23 @@ func NewQueue(workers int) *Queue {
 	return q
 }
 
-// Submit pousse un job dans la queue et bloque jusqu'au résultat. Le contexte
-// permet trois sorties anticipées : queue saturée (enqueueTimeout), pipeline
-// dépassant jobTimeout, ou annulation côté client (ctx.Done).
+// Submit pousse un job dans la queue et bloque jusqu'au résultat. Le timeout
+// est découplé : queueTimeout (45s) max pour attendre dans la file d'attente,
+// et execTimeout (60s) max pour le traitement une fois pris par un worker.
 func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 	resultCh := make(chan JobResult, 1)
-	item := queueItem{ctx: ctx, job: job, resultCh: resultCh}
+	startCh := make(chan struct{})
+
+	queueCtx, queueCancel := context.WithTimeout(ctx, queueTimeout)
+	defer queueCancel()
+
+	item := queueItem{
+		ctx:      ctx,
+		job:      job,
+		resultCh: resultCh,
+		queueCtx: queueCtx,
+		startCh:  startCh,
+	}
 
 	enqueueTimer := time.NewTimer(enqueueTimeout)
 	defer enqueueTimer.Stop()
@@ -76,13 +90,21 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 		return JobResult{Err: errClientGone}
 	}
 
-	jobTimer := time.NewTimer(jobTimeout)
-	defer jobTimer.Stop()
+	// Attente du démarrage de l'exécution par un worker ou du timeout d'attente
+	select {
+	case <-startCh:
+		// Le job a commencé son exécution !
+	case <-queueCtx.Done():
+		if ctx.Err() != nil {
+			return JobResult{Err: errClientGone}
+		}
+		return JobResult{Err: errQueueTimeout}
+	}
+
+	// Attente du résultat final
 	select {
 	case res := <-resultCh:
 		return res
-	case <-jobTimer.C:
-		return JobResult{Err: errTimeout}
 	case <-ctx.Done():
 		return JobResult{Err: errClientGone}
 	}
@@ -90,8 +112,22 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 
 func (q *Queue) runWorker(id int) {
 	for item := range q.jobs {
+		// Vérification si le job a déjà expiré dans la file d'attente
+		if item.queueCtx.Err() != nil {
+			log.Printf("[worker %d] job %s ignoré (expiré dans la file d'attente)", id, item.job.FilePath)
+			continue
+		}
+
+		// On signale au Submit que l'on prend le job en charge
+		close(item.startCh)
+
 		log.Printf("[worker %d] traitement %s", id, item.job.FilePath)
-		res := runPipeline(item.ctx, item.job)
+		
+		// Contexte d'exécution avec un timeout frais de 60 secondes
+		execCtx, execCancel := context.WithTimeout(item.ctx, execTimeout)
+		res := runPipeline(execCtx, item.job)
+		execCancel()
+
 		// resultCh est buffered 1 : non bloquant même si Submit a déjà rendu
 		// la main suite à un timeout ou une annulation côté client.
 		item.resultCh <- res
@@ -144,33 +180,35 @@ func runPipeline(ctx context.Context, job Job) JobResult {
 	// sur l'image entière avant de segmenter. Sur des scans HD où Tesseract
 	// rend un texte bruité (cas solange, CNI N&B 2480x3508), le LLM avec
 	// le contexte global peut extraire des champs que Tesseract rate.
+	//
+	// La pleine page est tentée même sur un document multi-zones (recto+verso
+	// de CNI sur une A4). Auparavant on la sautait au profit direct de la
+	// segmentation, parce que le LLM full-page partait en boucle sur le
+	// remplissage `<` des MRZ et n'atteignait pas le verso. Avec
+	// FrequencyPenalty (cf. llm.go) cette boucle est cassée : la pleine page
+	// lit recto et verso de bout en bout (vérifié stable sur solange), ce que
+	// le skip rendait impossible. Bénéfice principal : un seul appel LLM
+	// pleine page au lieu de N appels concurrents sur des crops, donc beaucoup
+	// moins de charge backend. La segmentation reste en filet de sécurité
+	// juste après si le score est encore insuffisant.
 	if !usedLLM && scoreAnalysis(analysis) < segmentationTriggerScore && !IsPDF(job.FilePath) {
-		// Sur un document multi-zones (recto+verso de CNI sur une A4), le LLM
-		// full-page est presque toujours supplanté par la segmentation. On le
-		// saute alors pour économiser un appel LLM et alléger la charge du backend LLM
-		// sous rafale (detectRegions = ImageMagick, hors goulot LLM).
-		if regions, _ := detectRegions(job.FilePath); len(regions) >= 2 {
-			log.Printf("   Score initial=%d (Tesseract), %d zones — full-page sauté, segmentation directe",
-				scoreAnalysis(analysis), len(regions))
-		} else {
-			log.Printf("   Score initial=%d (Tesseract) — fallback LLM image entière",
-				scoreAnalysis(analysis))
-			llmText, llmErr := RunLLM(ctx, job.FilePath, job.Model, job.LLMURL)
-			if llmErr != nil {
-				log.Printf("   LLM full-page échoué: %v", llmErr)
-			} else if llmText != "" {
-				llmAnalysis := AnalyzeText(llmText, job.Input)
-				if debug {
-					debugLogRawText("llm-full", llmAnalysis)
-				}
-				if scoreAnalysis(llmAnalysis) > scoreAnalysis(analysis) {
-					log.Printf("   LLM full-page retenu: score %d -> %d",
-						scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
-					analysis = llmAnalysis
-					analysis.source = srcLLM
-				} else {
-					log.Printf("   LLM full-page n'améliore pas, conservation initiale")
-				}
+		log.Printf("   Score initial=%d (Tesseract) — fallback LLM image entière",
+			scoreAnalysis(analysis))
+		llmText, llmErr := RunLLM(ctx, job.FilePath, job.Model, job.LLMURL)
+		if llmErr != nil {
+			log.Printf("   LLM full-page échoué: %v", llmErr)
+		} else if llmText != "" {
+			llmAnalysis := AnalyzeText(llmText, job.Input)
+			if debug {
+				debugLogRawText("llm-full", llmAnalysis)
+			}
+			if scoreAnalysis(llmAnalysis) > scoreAnalysis(analysis) {
+				log.Printf("   LLM full-page retenu: score %d -> %d",
+					scoreAnalysis(analysis), scoreAnalysis(llmAnalysis))
+				analysis = llmAnalysis
+				analysis.source = srcLLM
+			} else {
+				log.Printf("   LLM full-page n'améliore pas, conservation initiale")
 			}
 		}
 	}
@@ -233,7 +271,8 @@ type queueErr string
 func (e queueErr) Error() string { return string(e) }
 
 const (
-	errTimeout    queueErr = "timeout: pipeline OCR + analyse n'a pas répondu dans le délai imparti"
-	errQueueFull  queueErr = "queue saturée: réessayez plus tard"
-	errClientGone queueErr = "requête annulée par le client"
+	errQueueTimeout queueErr = "queue timeout: le job a attendu trop longtemps dans la file sans être pris en charge"
+	errTimeout      queueErr = "timeout: pipeline OCR + analyse n'a pas répondu dans le délai d'exécution imparti"
+	errQueueFull    queueErr = "queue saturée: réessayez plus tard"
+	errClientGone   queueErr = "requête annulée par le client"
 )

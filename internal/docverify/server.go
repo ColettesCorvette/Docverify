@@ -1,13 +1,16 @@
 package docverify
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 )
 
@@ -46,6 +49,15 @@ func DefaultModelName() string {
 // V1 sans AuthMiddleware ni RBAC : docverify est un service interne
 // appelé uniquement par Regia (réseau K8s). À ajouter pour la V2.
 func StartServer() {
+	InitLLMSemaphore()
+
+	llmURL := DefaultLLMURL()
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	if err := PingLLM(ctx, llmURL); err != nil {
+		log.Printf("Avertissement : LLM non joignable au demarrage (%s): %v", llmURL, err)
+	}
+	cancel()
+
 	queue := NewQueue(DefaultWorkers())
 
 	mux := http.NewServeMux()
@@ -62,16 +74,41 @@ func StartServer() {
 		IdleTimeout:       120 * time.Second,
 	}
 
-	log.Printf("Serveur docverify sur :8680 (LLM=%s)", DefaultLLMURL())
-	log.Fatal(srv.ListenAndServe())
+	go func() {
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+		sig := <-sigCh
+		log.Printf("Signal %v recu, arret gracieux en cours...", sig)
+		shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer shutdownCancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			log.Printf("Erreur arret gracieux: %v", err)
+		}
+	}()
+
+	log.Printf("Serveur docverify sur :8680 (LLM=%s)", llmURL)
+	if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
+	log.Println("Serveur arrete proprement")
 }
 
 // --- Health check ---------------------------------------------------------
 
 func handleHealth(w http.ResponseWriter, r *http.Request) {
+	status := map[string]string{"status": "ok"}
+	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+	defer cancel()
+	if err := PingLLM(ctx, DefaultLLMURL()); err != nil {
+		status["llm"] = "unreachable"
+		status["status"] = "degraded"
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		json.NewEncoder(w).Encode(status)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+	json.NewEncoder(w).Encode(status)
 }
 
 // writeJSONError renvoie une erreur au format JSON.
@@ -198,8 +235,8 @@ func handlePipelineError(w http.ResponseWriter, err error) {
 		w.WriteHeader(statusClientClosed)
 	case errors.Is(err, errQueueFull):
 		writeJSONError(w, http.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, errTimeout):
-		log.Printf("Pipeline timeout (>%s) — verdict unreadable renvoyé", jobTimeout)
+	case errors.Is(err, errTimeout) || errors.Is(err, errQueueTimeout):
+		log.Printf("Pipeline timeout (%v) — verdict unreadable renvoyé", err)
 		unreadable := AnalysisResult{
 			DocType:    DocTypeUnknown,
 			Unreadable: true,
