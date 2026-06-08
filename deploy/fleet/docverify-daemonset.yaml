@@ -33,11 +33,17 @@ spec:
         - containerPort: 8680
           name: http
         env:
-        # DMR Metal host-natif du Mac, atteint depuis le namespace réseau du nœud.
-        - name: LLM_URL
-          value: "http://host.lima.internal:12434/engines"
-        - name: LLM_MODEL
-          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+        # DMR/vLLM auto-détectés dynamiquement au démarrage par docverify.
+        # - name: LLM_URL
+        #   value: "http://host.lima.internal:12434/engines"
+        # - name: LLM_MODEL
+        #   value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+        - name: REGISTRY_URL
+          value: "http://192.168.30.25:8681" # Adresse IP du registre central/Caddy (à adapter)
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         - name: QUEUE_WORKERS
           value: "3"
         - name: LLM_MAX_CONCURRENT

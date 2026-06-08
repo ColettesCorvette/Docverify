@@ -22,16 +22,17 @@ spec:
         - containerPort: 8680
           name: http
         env:
-        # DMR tourne côté hôte (Docker Model Runner, Metal). On vise l'IP
-        # host-gateway fixe de Docker Desktop plutôt que host.k3d.internal :
-        # ce nom est injecté dans CoreDNS à la création du cluster seulement et
-        # disparaît au reboot, et CoreDNS lui-même peut ne pas redémarrer. L'IP
-        # 192.168.65.254 est une constante Docker Desktop, identique sur tous
-        # les Macs, et supprime toute dépendance DNS du chemin LLM.
-        - name: LLM_URL
-          value: "http://192.168.65.254:12434/engines"
-        - name: LLM_MODEL
-          value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+        # DMR/vLLM auto-détectés dynamiquement au démarrage par docverify.
+        # - name: LLM_URL
+        #   value: "http://192.168.65.254:12434/engines"
+        # - name: LLM_MODEL
+        #   value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+        - name: REGISTRY_URL
+          value: "http://192.168.30.25:8681" # Adresse IP du registre central/Caddy
+        - name: NODE_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.hostIP
         # QUEUE_WORKERS borne le parallélisme par pod. Le total réel vaut
         # replicas x QUEUE_WORKERS et doit rester proche de la capacité LLM
         # cumulée, soit nb_de_Macs x 5 places de --max-num-seqs. Un seul Mac :

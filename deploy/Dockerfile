@@ -1,5 +1,5 @@
 # --- Compilation --- 
-FROM --platform=linux/arm64 golang:1.26-bookworm AS builder
+FROM golang:1.26-bookworm AS builder
 WORKDIR /usr/local/app
 COPY go.mod .
 RUN go mod download
@@ -7,7 +7,7 @@ COPY . .
 RUN go build -o /docverify ./cmd/docverify
 
 # --- Image finale ---
-FROM --platform=linux/arm64 debian:bookworm-slim
+FROM debian:bookworm-slim
 WORKDIR /usr/local/app
 
 RUN apt-get update && apt-get install -y \
