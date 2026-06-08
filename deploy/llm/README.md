@@ -1,8 +1,7 @@
 # Backends LLM vLLM par type de machine
 
 Images vLLM préparées et versionnées pour servir le VLM derrière une API
-OpenAI, une par accélérateur Linux. Remplace `scripts/gen-llm-backend.sh`, qui
-détectait le GPU et générait un manifeste à la volée : des images construites et
+OpenAI, une par accélérateur Linux. Des images construites et
 taguées sont plus reproductibles et auditables qu'un script.
 
 docverify n'est pas modifié : il parle OpenAI au Service `vllm`, soit

@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
-# Build une image de backend LLM vLLM pour une plateforme donnée. Remplace la
-# détection-à-l'exécution de gen-llm-backend.sh par des images préparées et
-# versionnées : on construit, on tague, on pousse, le déploiement référence le tag.
+# Build une image de backend LLM vLLM pour une plateforme donnée avec des images
+# préparées et versionnées : on construit, on tague, on pousse, le déploiement référence le tag.
 #
 # Usage :
 #   PLATFORM=cuda ./deploy/llm/build.sh

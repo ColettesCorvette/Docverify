@@ -98,7 +98,7 @@ Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. 
 | `deploy-fleet.sh` | [NOUVEAU] Script pour automatiser les déploiements Git+Redeploy à distance via SSH |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
 
-Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh` ; elles remplacent l'ancien `gen-llm-backend.sh`, conservé mais obsolète.
+Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh`.
 
 Le détail de chaque script et de sa configuration est sur la page [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) du wiki.
 
