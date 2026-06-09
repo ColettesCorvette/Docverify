@@ -16,7 +16,7 @@ Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si
 
 Le verdict porte un niveau de confiance à quatre paliers, de `nul` à `haut`, qui reflète le chemin ayant produit le résultat : un 2D-DOC à signature vérifiée ou un OCR net donnent `haut`, le LLM plafonne à `moyen`, une rescousse par segmentation reste `bas`, un document illisible est `nul`. Regia s'en sert pour décider de l'automatisation : `haut` passe seul, `moyen` ou `bas` demandent une confirmation manuelle, `nul` est rejeté.
 
-Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 4 E4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via `host.k3d.internal`. Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
+Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 4 E4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via la passerelle hôte fixe `192.168.65.254:12434` (ce qui évite les pannes DNS au redémarrage des clusters k3d). Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et s
 ./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
 ```
 
-Les pods atteignent le runner via `host.k3d.internal:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
+Les pods atteignent le runner via la passerelle hôte `192.168.65.254:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
 
 ## Documentation
 

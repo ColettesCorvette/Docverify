@@ -2,7 +2,7 @@
 # Provisionne un Mac en unite docverify autonome pour la flotte phase 2.
 #
 # Topologie shared-nothing : chaque Mac est independant.
-#   k3d (docverify, 2 replicas)  ->  DMR Metal local via host.k3d.internal:12434
+#   k3d (docverify, 2 replicas)  ->  DMR Metal local via 192.168.65.254:12434
 # Aucun appel LLM ne traverse le LAN. Le LB de flotte ne fait que repartir
 # le trafic HTTP entrant sur les :8680 des Macs. Voir deploy/fleet/README.md.
 #

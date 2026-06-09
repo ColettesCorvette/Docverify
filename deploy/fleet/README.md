@@ -20,7 +20,7 @@ Regia ─► LB de flotte ─────┤                        127.0.0.1:12
 ```
 
 - Aucun appel LLM ne traverse le LAN : chaque docverify parle a son DMR local
-  via `host.k3d.internal:12434`. DMR reste sur `127.0.0.1`, pas d'exposition.
+  via la passerelle hôte `192.168.65.254:12434`. DMR reste sur `127.0.0.1`, pas d'exposition.
 - Le LB ne repartit que le trafic HTTP entrant sur les `:8680` publies par k3d.
 - **Mise a l'echelle dynamique** : Les nœuds (Macs et Linux) s'auto-enregistrent dynamiquement auprès du registre central (inclus dans `./docverify --registry`) qui gère et actualise à chaud les backends du `Caddyfile` de flotte sans modification manuelle.
 - Tolerance de panne : le health-check `/health` ejecte un Mac dont docverify ou
