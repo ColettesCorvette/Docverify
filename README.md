@@ -110,5 +110,3 @@ Le détail de chaque script et de sa configuration est sur la page [Scripts](htt
 Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM en shared-nothing (un nœud k3d autonome + DMR local par machine).
 
 Pour s'adapter aux Mac workers de 24 Go de RAM, le modèle vision-langage de production est quantisé en `Q4_K_M` (4.62 GiB), ce qui libère 3 Go de VRAM par nœud tout en conservant une justesse de 100% au benchmark. Le système supporte les rafales de charge intense (ex: 12 requêtes simultanées) sans crash ni timeout grâce au découplage du cycle de vie des tâches (timeout d'attente court en file et timeout d'exécution garanti pour le worker).
-
-La mise à l'échelle vers un vrai cluster Kubernetes multi-nœuds (lima + k3s) a été scriptée mais est conservée en option pour éviter la perte de 4 Go de RAM par VM Linux sur les workers de 24 Go. Le déploiement par défaut reste la topologie shared-nothing orchestrée à distance par les scripts d'administration.
