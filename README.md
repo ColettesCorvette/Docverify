@@ -20,21 +20,24 @@ Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 
 
 ## Architecture
 
-```
-┌─────────────────────────── Host Mac ───────────────────────────────┐
-│  Docker Desktop                                                     │
-│    ├─ k3d "mini-cluster"                                            │
-│    │    docverify-pod-1 ┐                                            │
-│    │    docverify-pod-2 ┼──→  host.k3d.internal:12434/engines        │
-│    │                                                  │             │
-│    └─ Docker Model Runner  ◄──────────────────────────┘             │
-│              │ llama.cpp · GPU Metal · process hôte                 │
-│              ▼                                                      │
-│         Gemma 4 E4B (GGUF)                                          │
-└─────────────────────────────────────────────────────────────────────┘
-```
+### Développement Local (k3d mono-nœud)
+Le schéma ci-dessous illustre le fonctionnement sur une machine de développement unique. Les pods `docverify` s'exécutent dans un cluster local `k3d` et atteignent le **Docker Model Runner (DMR)** s'exécutant sur l'hôte pour utiliser le GPU Metal du Mac :
 
-Une requête suit le chemin : Regia → pod docverify → Docker Model Runner sur l'hôte → Gemma 4 E4B.
+![Architecture locale](assets/pipeline_cascade.svg)
+
+Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
+
+### Production / Flotte Multi-nœuds (Shared-Nothing)
+En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy**, dont la configuration est régénérée dynamiquement par le **Registre de flotte** centralisé à chaque signal de heartbeat d'un nœud actif :
+
+![Infrastructure de Flotte](assets/infrastructure_production.svg)
+
+### Modèle de Données & Structures Go
+Le schéma suivant montre l'organisation des principales structures de données du projet, leurs relations (mode unitaire vs mode batch) et l'intégration avec la queue de travail et l'analyse 2D-DOC :
+
+![Diagramme des Structures Go](assets/diagramme_structures_go.svg)
+
+
 
 ## Briques externes
 

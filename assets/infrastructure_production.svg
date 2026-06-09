@@ -1,0 +1,195 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 850 560" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="mac-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#334155" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="k3d-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+    <linearGradient id="dmr-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" />
+      <stop offset="100%" stop-color="#d97706" />
+    </linearGradient>
+    <linearGradient id="lb-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ec4899" />
+      <stop offset="100%" stop-color="#db2777" />
+    </linearGradient>
+    <linearGradient id="reg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" />
+      <stop offset="100%" stop-color="#6d28d9" />
+    </linearGradient>
+    
+    <!-- Drop Shadows -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="850" height="560" rx="12" fill="url(#bg-grad)" />
+
+  <!-- Title -->
+  <text x="425" y="35" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold" fill="#f8fafc" text-anchor="middle">
+    Infrastructure Réelle de Flotte (Shared-Nothing)
+  </text>
+  <text x="425" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">
+    Macs autonomes avec k3d locaux, équilibrés par Caddy via un registre dynamique
+  </text>
+
+  <!-- Client / Regia (Left) -->
+  <g transform="translate(20, 240)" filter="url(#shadow)">
+    <rect width="110" height="80" rx="8" fill="#475569" stroke="#64748b" stroke-width="2" />
+    <text x="55" y="40" font-family="system-ui, sans-serif" font-size="15" font-weight="bold" fill="#f8fafc" text-anchor="middle">Back-Office</text>
+    <text x="55" y="60" font-family="system-ui, sans-serif" font-size="13" fill="#cbd5e1" text-anchor="middle">Regia</text>
+  </g>
+
+  <!-- Flow Arrow Regia -> LB -->
+  <g stroke="#94a3b8" stroke-width="2" fill="none">
+    <path d="M 130 280 L 175 280" />
+    <polygon points="175,280 167,275 167,285" fill="#94a3b8" stroke="none" />
+  </g>
+
+  <!-- Load Balancer Caddy (Middle-Left) -->
+  <g transform="translate(180, 150)" filter="url(#shadow)">
+    <rect width="130" height="110" rx="8" fill="url(#lb-grad)" stroke="#f472b6" stroke-width="1.5" />
+    <text x="65" y="35" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Load Balancer</text>
+    <text x="65" y="60" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Caddy</text>
+    <text x="65" y="90" font-family="monospace" font-size="12" fill="#fdf2f8" text-anchor="middle">Port :8680</text>
+  </g>
+
+  <!-- Registre Central (Bottom-Left) -->
+  <g transform="translate(180, 310)" filter="url(#shadow)">
+    <rect width="130" height="110" rx="8" fill="url(#reg-grad)" stroke="#a78bfa" stroke-width="1.5" />
+    <text x="65" y="35" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Registre Flotte</text>
+    <text x="65" y="60" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify --registry</text>
+    <text x="65" y="90" font-family="monospace" font-size="12" fill="#f5f3ff" text-anchor="middle">Port :8681</text>
+  </g>
+
+  <!-- Relation Registre -> Caddyfile -> LB -->
+  <g stroke="#a78bfa" stroke-width="1.5" fill="none">
+    <path d="M 245 310 L 245 260" />
+    <polygon points="245,260 241,268 249,268" fill="#a78bfa" stroke="none" />
+  </g>
+  <text x="252" y="290" font-family="system-ui, sans-serif" font-size="10" fill="#a78bfa">Génère Caddyfile</text>
+
+  <!-- Connections LB -> Macs physical ports -->
+  <g stroke="#ec4899" stroke-width="1.5" stroke-dasharray="4" fill="none">
+    <path d="M 310 205 L 360 205 L 360 170 L 400 170" />
+    <polygon points="400,170 392,166 392,174" fill="#ec4899" stroke="none" />
+
+    <path d="M 310 205 L 360 205 L 360 390 L 400 390" />
+    <polygon points="400,390 392,386 392,394" fill="#ec4899" stroke="none" />
+  </g>
+  <text x="365" y="155" font-family="system-ui, sans-serif" font-size="9" fill="#f472b6">HTTP :8680</text>
+  <text x="365" y="375" font-family="system-ui, sans-serif" font-size="9" fill="#f472b6">HTTP :8680</text>
+
+  <!-- ─── NODE 1: MAC MINI #1 ─── -->
+  <g transform="translate(420, 80)" filter="url(#shadow)">
+    <!-- Physical Mac Mini Box -->
+    <rect width="400" height="210" rx="10" fill="url(#mac-grad)" stroke="#475569" stroke-width="2" />
+    <text x="15" y="25" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#cbd5e1">Mac Mini M4 Pro (Physique #1 - IP LAN_1)</text>
+    
+    <!-- Docker Desktop VM / Container Bridge Layer -->
+    <g transform="translate(15, 45)">
+      <rect width="180" height="145" rx="6" fill="url(#k3d-grad)" stroke="#38bdf8" stroke-width="1.5" />
+      <text x="12" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">Cluster k3d local</text>
+      
+      <!-- Pods docverify (x2 replicas) -->
+      <g transform="translate(12, 35)">
+        <rect width="156" height="42" rx="4" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1" />
+        <text x="78" y="18" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify-pod-1</text>
+        <text x="78" y="32" font-family="monospace" font-size="9" fill="#bae6fd" text-anchor="middle">192.168.65.254:12434</text>
+      </g>
+      <g transform="translate(12, 87)">
+        <rect width="156" height="42" rx="4" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1" />
+        <text x="78" y="18" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify-pod-2</text>
+        <text x="78" y="32" font-family="monospace" font-size="9" fill="#bae6fd" text-anchor="middle">192.168.65.254:12434</text>
+      </g>
+    </g>
+
+    <!-- macOS Host Layer (DMR + Metal) -->
+    <g transform="translate(210, 45)">
+      <rect width="175" height="145" rx="6" fill="url(#dmr-grad)" stroke="#fbbf24" stroke-width="1.5" />
+      <text x="12" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">Hôte macOS</text>
+      
+      <g transform="translate(12, 35)">
+        <rect width="151" height="95" rx="4" fill="#78350f" stroke="#f59e0b" stroke-width="1" />
+        <text x="75" y="22" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">Docker Model Runner</text>
+        <text x="75" y="42" font-family="system-ui, sans-serif" font-size="11" fill="#fcd34d" text-anchor="middle">Gemma 4 (Metal GPU)</text>
+        <text x="75" y="65" font-family="monospace" font-size="11" fill="#fde68a" text-anchor="middle">Port TCP 12434</text>
+        <text x="75" y="82" font-family="monospace" font-size="9" fill="#fef08a" text-anchor="middle">(127.0.0.1:12434)</text>
+      </g>
+    </g>
+
+    <!-- Connection Pod -> DMR (via host gateway) -->
+    <g stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3" fill="none">
+      <path d="M 195 130 L 210 130" />
+      <polygon points="210,130 203,126 203,134" fill="#f59e0b" stroke="none" />
+    </g>
+  </g>
+
+  <!-- ─── NODE 2: MAC MINI #2 ─── -->
+  <g transform="translate(420, 310)" filter="url(#shadow)">
+    <!-- Physical Mac Mini Box -->
+    <rect width="400" height="210" rx="10" fill="url(#mac-grad)" stroke="#475569" stroke-width="2" />
+    <text x="15" y="25" font-family="system-ui, sans-serif" font-size="13" font-weight="bold" fill="#cbd5e1">Mac Mini M4 Pro (Physique #2 - IP LAN_2)</text>
+    
+    <!-- Docker Desktop VM / Container Bridge Layer -->
+    <g transform="translate(15, 45)">
+      <rect width="180" height="145" rx="6" fill="url(#k3d-grad)" stroke="#38bdf8" stroke-width="1.5" />
+      <text x="12" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">Cluster k3d local</text>
+      
+      <!-- Pods docverify (x2 replicas) -->
+      <g transform="translate(12, 35)">
+        <rect width="156" height="42" rx="4" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1" />
+        <text x="78" y="18" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify-pod-1</text>
+        <text x="78" y="32" font-family="monospace" font-size="9" fill="#bae6fd" text-anchor="middle">192.168.65.254:12434</text>
+      </g>
+      <g transform="translate(12, 87)">
+        <rect width="156" height="42" rx="4" fill="#0c4a6e" stroke="#0ea5e9" stroke-width="1" />
+        <text x="78" y="18" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify-pod-2</text>
+        <text x="78" y="32" font-family="monospace" font-size="9" fill="#bae6fd" text-anchor="middle">192.168.65.254:12434</text>
+      </g>
+    </g>
+
+    <!-- macOS Host Layer (DMR + Metal) -->
+    <g transform="translate(210, 45)">
+      <rect width="175" height="145" rx="6" fill="url(#dmr-grad)" stroke="#fbbf24" stroke-width="1.5" />
+      <text x="12" y="22" font-family="system-ui, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">Hôte macOS</text>
+      
+      <g transform="translate(12, 35)">
+        <rect width="151" height="95" rx="4" fill="#78350f" stroke="#f59e0b" stroke-width="1" />
+        <text x="75" y="22" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#ffffff" text-anchor="middle">Docker Model Runner</text>
+        <text x="75" y="42" font-family="system-ui, sans-serif" font-size="11" fill="#fcd34d" text-anchor="middle">Gemma 4 (Metal GPU)</text>
+        <text x="75" y="65" font-family="monospace" font-size="11" fill="#fde68a" text-anchor="middle">Port TCP 12434</text>
+        <text x="75" y="82" font-family="monospace" font-size="9" fill="#fef08a" text-anchor="middle">(127.0.0.1:12434)</text>
+      </g>
+    </g>
+
+    <!-- Connection Pod -> DMR (via host gateway) -->
+    <g stroke="#f59e0b" stroke-width="1.5" stroke-dasharray="3" fill="none">
+      <path d="M 195 130 L 210 130" />
+      <polygon points="210,130 203,126 203,134" fill="#f59e0b" stroke="none" />
+    </g>
+  </g>
+
+  <!-- Heartbeat path (Pods -> Registry) -->
+  <g stroke="#a78bfa" stroke-width="1" stroke-dasharray="2" fill="none">
+    <!-- Mac 1 Pods -> Registry -->
+    <path d="M 420 180 L 330 180 L 330 365 L 310 365" />
+    <polygon points="310,365 318,361 318,369" fill="#a78bfa" stroke="none" />
+    
+    <!-- Mac 2 Pods -> Registry -->
+    <path d="M 420 410 L 330 410 L 330 365 L 310 365" />
+    <polygon points="310,365 318,361 318,369" fill="#a78bfa" stroke="none" />
+  </g>
+  <text x="340" y="340" font-family="system-ui, sans-serif" font-size="8" fill="#c084fc" text-anchor="middle" transform="rotate(-90 340 340)">Heartbeat /register</text>
+
+</svg>

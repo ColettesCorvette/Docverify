@@ -1,0 +1,152 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 982.7502499999999 2206.385" width="982.7502499999999" height="2206.385" style="--bg:#FFFFFF;--fg:#3B3B3B;--line:#3B3B3B;--accent:#005FB8;--muted:#3B3B3BCC;--surface:#F8F8F8;--border:#3B3B3B;background:var(--bg)">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap');
+  text { font-family: 'Inter', system-ui, sans-serif; }
+  svg {
+    /* Derived from --bg and --fg (overridable via --line, --accent, etc.) */
+    --_text:          var(--fg);
+    --_text-sec:      var(--muted, color-mix(in srgb, var(--fg) 60%, var(--bg)));
+    --_text-muted:    var(--muted, color-mix(in srgb, var(--fg) 40%, var(--bg)));
+    --_text-faint:    color-mix(in srgb, var(--fg) 25%, var(--bg));
+    --_line:          var(--line, color-mix(in srgb, var(--fg) 50%, var(--bg)));
+    --_arrow:         var(--accent, color-mix(in srgb, var(--fg) 85%, var(--bg)));
+    --_node-fill:     var(--surface, color-mix(in srgb, var(--fg) 3%, var(--bg)));
+    --_node-stroke:   var(--border, color-mix(in srgb, var(--fg) 20%, var(--bg)));
+    --_group-fill:    var(--bg);
+    --_group-hdr:     color-mix(in srgb, var(--fg) 5%, var(--bg));
+    --_inner-stroke:  color-mix(in srgb, var(--fg) 12%, var(--bg));
+    --_key-badge:     color-mix(in srgb, var(--fg) 10%, var(--bg));
+  }
+</style>
+<defs>
+  <marker id="arrowhead" markerWidth="8" markerHeight="5" refX="7" refY="2.5" orient="auto">
+    <polygon points="0 0, 8 2.5, 0 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+  <marker id="arrowhead-start" markerWidth="8" markerHeight="5" refX="1" refY="2.5" orient="auto-start-reverse">
+    <polygon points="8 0, 0 2.5, 8 5" fill="var(--_arrow)" stroke="var(--_arrow)" stroke-width="0.75" stroke-linejoin="round" />
+  </marker>
+</defs>
+<polyline class="edge" data-from="A" data-to="B" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="390.6716666666666,76.9 390.6716666666666,124.9" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B" data-to="C" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Oui" points="352.38649999999996,316.3258333333333 352.38649999999996,366.611 217.69650000000001,366.611 217.69650000000004,458.911" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="C" data-to="D" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="217.69650000000004,495.811 217.69650000000001,531.8109999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="D" data-to="E" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="217.69650000000001,568.7109999999999 217.69650000000001,616.7109999999999" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="B" data-to="F" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Non / Échec" points="428.9568333333333,316.3258333333333 428.9568333333333,390.6110000000001 515.4575,390.6110000000001 515.4575,458.911" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="F" data-to="G" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Oui" points="484.5823333333333,613.2868333333333 484.5823333333333,692.162 436.39300000000003,692.162 436.39300000000003,772.462" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="F" data-to="H" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Non" points="546.3326666666667,613.2868333333333 546.3326666666667,692.162 594.522,692.162 594.5219999999999,772.462" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="G" data-to="I" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="436.39300000000003,809.362 436.39300000000003,833.362 515.4575,833.362 515.4575,857.362" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="H" data-to="I" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="594.522,809.362 594.522,833.362 515.4575,833.362 515.4575,857.362" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="I" data-to="J" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Oui" points="484.2118333333333,1013.5903333333333 484.2118333333333,1149.136 421.4649166666667,1149.136 421.4649166666667,2117.485 480.13486666666665,2117.485 480.13486666666665,2129.485" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="I" data-to="K" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Non" points="546.7031666666667,1013.5903333333333 546.7031666666667,1080.836 589.6134999999999,1080.836 589.6134999999999,1161.136" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="K" data-to="L" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="589.6134999999999,1198.036 589.6134999999999,1246.036" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L" data-to="J" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Oui" points="558.3678333333334,1402.2643333333335 558.3678333333334,1537.81 491.99808333333334,1537.81 491.99808333333334,2117.485 509.71746666666667,2117.485 509.71746666666667,2129.485" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="L" data-to="M" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Non" points="620.8591666666666,1402.2643333333333 620.8591666666666,1469.51 667.82925,1469.51 667.82925,1549.81" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="M" data-to="N" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="667.82925,1586.71 667.82925,1634.71" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="N" data-to="J" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Oui" points="629.0500833333333,1828.6058333333333 629.0500833333333,1971.685 562.82425,1971.685 562.82425,2117.485 539.3000666666667,2117.485 539.3000666666667,2129.485" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="N" data-to="O" data-style="solid" data-arrow-start="false" data-arrow-end="true" data-label="Non" points="706.6084166666667,1828.6058333333333 706.6084166666667,1903.385 772.83425,1903.385 772.83425,1983.685" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="O" data-to="P" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="772.83425,2020.585 772.83425,2068.585" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<polyline class="edge" data-from="P" data-to="J" data-style="solid" data-arrow-start="false" data-arrow-end="true" points="772.83425,2105.485 772.83425,2117.485 568.8826666666666,2117.485 568.8826666666666,2129.485" fill="none" stroke="var(--_line)" stroke-width="1" marker-end="url(#arrowhead)" />
+<g class="edge-label" data-from="B" data-to="C" data-label="Oui">
+  <rect x="200.69650000000001" y="373.611" width="33.094" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="217.2435" y="388.76099999999997" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Oui</text>
+</g>
+<g class="edge-label" data-from="B" data-to="F" data-label="Non / Échec">
+  <rect x="478.9575" y="397.6110000000001" width="72.89200000000001" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="515.4035" y="412.7610000000001" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Non / Échec</text>
+</g>
+<g class="edge-label" data-from="F" data-to="G" data-label="Oui">
+  <rect x="419.39300000000003" y="699.162" width="33.094" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="435.94000000000005" y="714.312" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Oui</text>
+</g>
+<g class="edge-label" data-from="F" data-to="H" data-label="Non">
+  <rect x="576.022" y="699.162" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="594.351" y="714.312" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Non</text>
+</g>
+<g class="edge-label" data-from="I" data-to="J" data-label="Oui">
+  <rect x="404.4649166666667" y="2080.185" width="33.094" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="421.0119166666667" y="2095.335" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Oui</text>
+</g>
+<g class="edge-label" data-from="I" data-to="K" data-label="Non">
+  <rect x="571.1134999999999" y="1087.836" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="589.4424999999999" y="1102.986" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Non</text>
+</g>
+<g class="edge-label" data-from="L" data-to="J" data-label="Oui">
+  <rect x="474.99808333333334" y="2056.185" width="33.094" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="491.54508333333337" y="2071.335" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Oui</text>
+</g>
+<g class="edge-label" data-from="L" data-to="M" data-label="Non">
+  <rect x="649.32925" y="1476.51" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="667.65825" y="1491.66" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Non</text>
+</g>
+<g class="edge-label" data-from="N" data-to="J" data-label="Oui">
+  <rect x="545.82425" y="2056.185" width="33.094" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="562.37125" y="2071.335" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Oui</text>
+</g>
+<g class="edge-label" data-from="N" data-to="O" data-label="Non">
+  <rect x="754.33425" y="1910.385" width="36.658" height="30.3" rx="2" ry="2" fill="var(--bg)" stroke="var(--_inner-stroke)" stroke-width="1" />
+  <text x="772.66325" y="1925.535" text-anchor="middle" font-size="11" font-weight="400" fill="var(--_text-sec)" dy="3.8499999999999996">Non</text>
+</g>
+<g class="node" data-id="A" data-label="Nouveau Document" data-shape="rectangle">
+  <rect x="313.01016666666663" y="40" width="155.32299999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="390.6716666666666" y="58.45" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Nouveau Document</text>
+</g>
+<g class="node" data-id="B" data-label="Possède un 2D-DOC signé ?" data-shape="diamond">
+  <polygon points="390.6716666666666,124.9 505.52716666666663,239.75549999999998 390.6716666666666,354.611 275.8161666666666,239.75549999999998" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="390.6716666666666" y="239.75549999999998" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Possède un 2D-DOC signé ?</text>
+</g>
+<g class="node" data-id="C" data-label="Lecture Datamatrix dmtxread" data-shape="rectangle">
+  <rect x="112.24750000000006" y="458.911" width="210.89799999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="217.69650000000004" y="477.361" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Lecture Datamatrix dmtxread</text>
+</g>
+<g class="node" data-id="D" data-label="Vérification de Signature Cryptographique TSL ANTS" data-shape="rectangle">
+  <rect x="40" y="531.8109999999999" width="355.39300000000003" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="217.69650000000001" y="550.261" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Vérification de Signature Cryptographique TSL ANTS</text>
+</g>
+<g class="node" data-id="E" data-label="Verdict Haute Confiance" data-shape="rectangle">
+  <rect x="126.32650000000001" y="616.7109999999999" width="182.73999999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="217.69650000000001" y="635.161" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Verdict Haute Confiance</text>
+</g>
+<g class="node" data-id="F" data-label="Est-ce un PDF natif ?" data-shape="diamond">
+  <polygon points="515.4575,458.91100000000006 608.083,551.5365 515.4575,644.162 422.832,551.5365" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="515.4575" y="551.5365" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Est-ce un PDF natif ?</text>
+</g>
+<g class="node" data-id="G" data-label="pdftotext" data-shape="rectangle">
+  <rect x="390.96500000000003" y="772.462" width="90.856" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="436.39300000000003" y="790.912" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">pdftotext</text>
+</g>
+<g class="node" data-id="H" data-label="Tesseract OCR direct" data-shape="rectangle">
+  <rect x="509.821" y="772.462" width="169.402" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="594.522" y="790.912" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Tesseract OCR direct</text>
+</g>
+<g class="node" data-id="I" data-label="Qualité OCR &gt;= 50% ?" data-shape="diamond">
+  <polygon points="515.4575,857.362 609.1945,951.0989999999999 515.4575,1044.836 421.7205,951.0989999999999" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="515.4575" y="951.0989999999999" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Qualité OCR &gt;= 50% ?</text>
+</g>
+<g class="node" data-id="J" data-label="Analyse Textuelle" data-shape="rectangle">
+  <rect x="450.5522666666667" y="2129.485" width="147.913" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="524.5087666666667" y="2147.935" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Analyse Textuelle</text>
+</g>
+<g class="node" data-id="K" data-label="Prétraitement ImageMagick + Tesseract" data-shape="rectangle">
+  <rect x="452.3015" y="1161.136" width="274.62399999999997" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="589.6134999999999" y="1179.586" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Prétraitement ImageMagick + Tesseract</text>
+</g>
+<g class="node" data-id="L" data-label="Qualité OCR &gt;= 50% ?" data-shape="diamond">
+  <polygon points="589.6134999999999,1246.036 683.3504999999999,1339.7730000000001 589.6134999999999,1433.5100000000002 495.87649999999996,1339.7730000000001" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="589.6134999999999" y="1339.7730000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Qualité OCR &gt;= 50% ?</text>
+</g>
+<g class="node" data-id="M" data-label="Inférence LLM Vision Gemma 4 E4B" data-shape="rectangle">
+  <rect x="543.11425" y="1549.81" width="249.42999999999998" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="667.82925" y="1568.26" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Inférence LLM Vision Gemma 4 E4B</text>
+</g>
+<g class="node" data-id="N" data-label="Score sémantique suffisant ?" data-shape="diamond">
+  <polygon points="667.82925,1634.71 784.16675,1751.0475000000001 667.82925,1867.3850000000002 551.49175,1751.0475000000001" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="667.82925" y="1751.0475000000001" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Score sémantique suffisant ?</text>
+</g>
+<g class="node" data-id="O" data-label="Segmentation ImageMagick connected-components" data-shape="rectangle">
+  <rect x="602.9182500000001" y="1983.685" width="339.83199999999994" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="772.83425" y="2002.135" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Segmentation ImageMagick connected-components</text>
+</g>
+<g class="node" data-id="P" data-label="Inférence LLM par zones découpées" data-shape="rectangle">
+  <rect x="642.56175" y="2068.585" width="260.545" height="36.900000000000006" rx="0" ry="0" fill="var(--_node-fill)" stroke="var(--_node-stroke)" stroke-width="0.75" />
+  <text x="772.83425" y="2087.035" text-anchor="middle" font-size="13" font-weight="500" fill="var(--_text)" dy="4.55">Inférence LLM par zones découpées</text>
+</g>
+</svg>

@@ -1,0 +1,211 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 700" width="100%" height="100%">
+  <defs>
+    <!-- Gradients -->
+    <linearGradient id="bg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="struct-grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
+    </linearGradient>
+    
+    <!-- Shadows -->
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1000" height="700" rx="12" fill="url(#bg-grad)" />
+
+  <!-- Title -->
+  <text x="500" y="40" font-family="system-ui, -apple-system, sans-serif" font-size="22" font-weight="bold" fill="#f8fafc" text-anchor="middle">
+    Diagramme des Structures Go &amp; Fichiers Sources
+  </text>
+  <text x="500" y="62" font-family="system-ui, -apple-system, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">
+    Types principaux et fonctions avec indication de leur fichier d'origine dans internal/docverify/
+  </text>
+
+  <!-- ─── BATCH INPUT (Top-Left) ─── -->
+  <g transform="translate(40, 100)" filter="url(#shadow)">
+    <rect width="200" height="145" rx="6" fill="url(#struct-grad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#38bdf8">BatchInput struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#93c5fd" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 200 35" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">Individuals []Individual</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">Documents []Document</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">Model string</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">LLMURL string</text>
+  </g>
+
+  <!-- ─── INDIVIDUAL (Top-Center) ─── -->
+  <g transform="translate(290, 100)" filter="url(#shadow)">
+    <rect width="200" height="165" rx="6" fill="url(#struct-grad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#38bdf8">Individual struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#93c5fd" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 200 35" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">ID string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">Name, Surname string</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">BirthDate string</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">PostalCodes []string</text>
+    <text x="15" y="135" font-family="monospace" font-size="11" fill="#cbd5e1">Cities []string</text>
+    <text x="15" y="155" font-family="monospace" font-size="11" fill="#cbd5e1">Referent bool</text>
+  </g>
+
+  <!-- ─── DOCUMENT (Top-Right) ─── -->
+  <g transform="translate(540, 100)" filter="url(#shadow)">
+    <rect width="200" height="165" rx="6" fill="url(#struct-grad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#38bdf8">Document struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#93c5fd" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 200 35" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">ID, Path string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">Individual string</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">Checks []string</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">Label string</text>
+    <text x="15" y="135" font-family="monospace" font-size="11" fill="#cbd5e1">ValidMonths int</text>
+  </g>
+
+  <!-- Relations BatchInput -> Individual & Document -->
+  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+    <path d="M 240 150 L 290 150" />
+    <polygon points="290,150 282,146 282,154" fill="#94a3b8" stroke="none" />
+    
+    <path d="M 240 180 L 415 180 L 415 275 L 640 275 L 640 265" />
+    <polygon points="640,265 636,273 644,273" fill="#94a3b8" stroke="none" />
+  </g>
+
+  <!-- ─── INPUT (Middle-Left) ─── -->
+  <g transform="translate(40, 290)" filter="url(#shadow)">
+    <rect width="200" height="165" rx="6" fill="url(#struct-grad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#38bdf8">Input struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#93c5fd" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 200 35" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">Name, Surname string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">PostalCodes []string</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">DocumentPath string</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">ValidMonths int</text>
+    <text x="15" y="135" font-family="monospace" font-size="11" fill="#cbd5e1">Model, LLMURL string</text>
+  </g>
+
+  <!-- ─── JOB (Middle-Center) ─── -->
+  <g transform="translate(290, 290)" filter="url(#shadow)">
+    <rect width="200" height="125" rx="6" fill="url(#struct-grad)" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#38bdf8">Job struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#93c5fd" font-style="italic">queue.go</text>
+    <path d="M 0 35 L 200 35" stroke="#38bdf8" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">FilePath string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#bae6fd">Input Input</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">Model, LLMURL string</text>
+  </g>
+  <!-- Relation Input -> Job -->
+  <g stroke="#94a3b8" stroke-width="1.5" fill="none">
+    <path d="M 240 355 L 290 355" />
+    <polygon points="290,355 282,351 282,359" fill="#94a3b8" stroke="none" />
+  </g>
+
+  <!-- ─── QUEUE (Middle-Right) ─── -->
+  <g transform="translate(540, 290)" filter="url(#shadow)">
+    <rect width="200" height="145" rx="6" fill="url(#struct-grad)" stroke="#10b981" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#10b981">Queue struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#a7f3d0" font-style="italic">queue.go</text>
+    <path d="M 0 35 L 200 35" stroke="#10b981" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">jobs chan queueItem</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">workers int</text>
+    <path d="M 0 95 L 200 95" stroke="#10b981" stroke-dasharray="2" />
+    <text x="15" y="112" font-family="monospace" font-size="10" fill="#34d399">Submit(ctx, Job) JRes</text>
+    <text x="15" y="128" font-family="monospace" font-size="10" fill="#34d399">runWorker(id int)</text>
+  </g>
+  <!-- Relation Job -> Queue -->
+  <g stroke="#10b981" stroke-width="1.5" fill="none">
+    <path d="M 490 355 L 540 355" />
+    <polygon points="540,355 532,351 532,359" fill="#10b981" stroke="none" />
+  </g>
+
+  <!-- ─── ANALYSIS RESULT (Bottom-Left) ─── -->
+  <g transform="translate(40, 480)" filter="url(#shadow)">
+    <rect width="210" height="205" rx="6" fill="url(#struct-grad)" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#f59e0b">AnalysisResult struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#fde047" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 210 35" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="15" y="53" font-family="monospace" font-size="10" fill="#cbd5e1">OK, DateValid bool</text>
+    <text x="15" y="69" font-family="monospace" font-size="10" fill="#cbd5e1">DocType DocType (enum)</text>
+    <text x="15" y="85" font-family="monospace" font-size="10" fill="#cbd5e1">NameFound, SurnameFound bool</text>
+    <text x="15" y="101" font-family="monospace" font-size="10" fill="#cbd5e1">PostalFound bool, PostalMatch</text>
+    <text x="15" y="117" font-family="monospace" font-size="10" fill="#cbd5e1">DocDate, ExpiryDate string</text>
+    <text x="15" y="133" font-family="monospace" font-size="10" fill="#cbd5e1">BirthDate, IssueDate string</text>
+    <text x="15" y="149" font-family="monospace" font-size="10" fill="#cbd5e1">Unreadable bool</text>
+    <text x="15" y="165" font-family="monospace" font-size="10" fill="#bae6fd">Confidence string (conf)</text>
+    <text x="15" y="181" font-family="monospace" font-size="10" fill="#cbd5e1">SignatureVerified bool</text>
+  </g>
+
+  <!-- ─── DOC RESULT (Bottom-Center) ─── -->
+  <g transform="translate(290, 480)" filter="url(#shadow)">
+    <rect width="220" height="165" rx="6" fill="url(#struct-grad)" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#f59e0b">DocResult struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#fde047" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 220 35" stroke="#f59e0b" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">DocumentID string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">IndividualID string</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">Checks []string</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">OK bool</text>
+    <text x="15" y="135" font-family="monospace" font-size="11" fill="#bae6fd">Analysis AnalysisResult</text>
+  </g>
+  <!-- Relation AnalysisResult -> DocResult -->
+  <g stroke="#f59e0b" stroke-width="1.5" fill="none">
+    <path d="M 250 580 L 290 580" />
+    <polygon points="290,580 282,576 282,584" fill="#f59e0b" stroke="none" />
+  </g>
+
+  <!-- ─── TWODDOC (Bottom-Right) ─── -->
+  <g transform="translate(540, 480)" filter="url(#shadow)">
+    <rect width="200" height="185" rx="6" fill="url(#struct-grad)" stroke="#a855f7" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#a855f7">TwoDDoc struct</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#e9d5ff" font-style="italic">twoddoc.go</text>
+    <path d="M 0 35 L 200 35" stroke="#a855f7" stroke-width="1.5" />
+    <text x="15" y="55" font-family="monospace" font-size="11" fill="#cbd5e1">Version string</text>
+    <text x="15" y="75" font-family="monospace" font-size="11" fill="#cbd5e1">AC, CertID string</text>
+    <text x="15" y="95" font-family="monospace" font-size="11" fill="#cbd5e1">EmitDate time.Time</text>
+    <text x="15" y="115" font-family="monospace" font-size="11" fill="#cbd5e1">DataZone string</text>
+    <text x="15" y="135" font-family="monospace" font-size="11" fill="#cbd5e1">Signature string</text>
+    <text x="15" y="155" font-family="monospace" font-size="11" fill="#cbd5e1">HasSignature bool</text>
+  </g>
+
+  <!-- ─── ENUM: DocType (Top-Far-Right) ─── -->
+  <g transform="translate(775, 100)" filter="url(#shadow)">
+    <rect width="180" height="165" rx="6" fill="#1e293b" stroke="#94a3b8" stroke-width="1.5" />
+    <text x="15" y="18" font-family="monospace" font-size="12" font-weight="bold" fill="#94a3b8">DocType type</text>
+    <text x="15" y="30" font-family="monospace" font-size="9" fill="#cbd5e1" font-style="italic">analyzer.go</text>
+    <path d="M 0 35 L 180 35" stroke="#94a3b8" stroke-width="1" />
+    <text x="15" y="55" font-family="monospace" font-size="10" fill="#e2e8f0">"inconnu"</text>
+    <text x="15" y="75" font-family="monospace" font-size="10" fill="#e2e8f0">"passeport"</text>
+    <text x="15" y="95" font-family="monospace" font-size="10" fill="#e2e8f0">"carte_identite"</text>
+    <text x="15" y="115" font-family="monospace" font-size="10" fill="#e2e8f0">"facture"</text>
+    <text x="15" y="135" font-family="monospace" font-size="10" fill="#e2e8f0">"courrier"</text>
+  </g>
+
+  <!-- Flow execution arrows from top elements to outputs -->
+  <g stroke="#f59e0b" stroke-dasharray="3" stroke-width="1.5" fill="none">
+    <path d="M 640 435 L 640 460 L 390 460 L 390 480" />
+    <polygon points="390,480 386,472 394,472" fill="#f59e0b" stroke="none" />
+  </g>
+
+  <!-- Helpers box -->
+  <g transform="translate(775, 290)" filter="url(#shadow)">
+    <rect width="180" height="195" rx="6" stroke="#94a3b8" stroke-dasharray="2" fill="#0f172a" />
+    <text x="15" y="20" font-family="system-ui, sans-serif" font-size="11" font-weight="bold" fill="#94a3b8">Fonctions Utiles</text>
+    <path d="M 0 30 L 180 30" stroke="#64748b" stroke-width="0.5" />
+    
+    <text x="15" y="45" font-family="monospace" font-size="9" fill="#60a5fa">AnalyzeText()</text>
+    <text x="15" y="58" font-family="monospace" font-size="9" fill="#94a3b8">   └ analyzer.go</text>
+    <text x="15" y="70" font-family="monospace" font-size="8" fill="#cbd5e1">   → AnalysisResult</text>
+    
+    <text x="15" y="95" font-family="monospace" font-size="9" fill="#60a5fa">EvaluateChecks()</text>
+    <text x="15" y="108" font-family="monospace" font-size="9" fill="#94a3b8">   └ analyzer.go</text>
+    <text x="15" y="120" font-family="monospace" font-size="8" fill="#cbd5e1">   → DocResult</text>
+
+    <text x="15" y="145" font-family="monospace" font-size="9" fill="#c084fc">VerifyDDOCSignature()</text>
+    <text x="15" y="158" font-family="monospace" font-size="9" fill="#a78bfa">   └ twoddoc_verify.go</text>
+    <text x="15" y="170" font-family="monospace" font-size="8" fill="#cbd5e1">   → (bool, error)</text>
+  </g>
+</svg>
