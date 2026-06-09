@@ -23,7 +23,7 @@ Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 
 ### Développement Local (k3d mono-nœud)
 Le schéma ci-dessous illustre le fonctionnement sur une machine de développement unique. Les pods `docverify` s'exécutent dans un cluster local `k3d` et atteignent le **Docker Model Runner (DMR)** s'exécutant sur l'hôte pour utiliser le GPU Metal du Mac :
 
-![Architecture locale](assets/pipeline_cascade.svg)
+<img src="assets/pipeline_cascade.svg" width="450" alt="Architecture locale" />
 
 Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
 
