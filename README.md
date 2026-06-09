@@ -32,13 +32,6 @@ En production, la flotte est distribuée sur plusieurs Mac Minis physiques auton
 
 ![Infrastructure de Flotte](assets/infrastructure_production.svg)
 
-### Modèle de Données & Structures Go
-Le schéma suivant montre l'organisation des principales structures de données du projet, leurs relations (mode unitaire vs mode batch) et l'intégration avec la queue de travail et l'analyse 2D-DOC :
-
-![Diagramme des Structures Go](assets/diagramme_structures_go.svg)
-
-
-
 ## Briques externes
 
 | Projet | Rôle |
