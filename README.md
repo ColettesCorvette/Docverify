@@ -23,14 +23,14 @@ Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 
 ### Développement Local (k3d mono-nœud)
 Le schéma ci-dessous illustre le fonctionnement sur une machine de développement unique. Les pods `docverify` s'exécutent dans un cluster local `k3d` et atteignent le **Docker Model Runner (DMR)** s'exécutant sur l'hôte pour utiliser le GPU Metal du Mac :
 
-<img src="assets/pipeline_cascade.svg" width="450" alt="Architecture locale" />
+<img src="assets/pipeline_cascade.svg" width="650" alt="Architecture locale" />
 
 Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
 
 ### Production / Flotte Multi-nœuds (Shared-Nothing)
 En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy**, dont la configuration est régénérée dynamiquement par le **Registre de flotte** centralisé à chaque signal de heartbeat d'un nœud actif :
 
-<img src="assets/infrastructure_production.svg" width="450" alt="Infrastructure de Flotte" />
+<img src="assets/infrastructure_production.svg" width="650" alt="Infrastructure de Flotte" />
 
 ## Briques externes
 
