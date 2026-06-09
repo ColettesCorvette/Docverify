@@ -24,7 +24,7 @@ if [ ! -f "$CADDYFILE" ]; then
     exit 1
 fi
 
-echo -e "${BOLD}${BLUE}🚀 Préparation du déploiement de la flotte depuis $CADDYFILE...${NC}"
+echo -e "${BOLD}${BLUE} Préparation du déploiement de la flotte depuis $CADDYFILE...${NC}"
 
 # Extrait les hôtes actifs (on ne garde que l'IP/hostname sans le port :8680)
 hosts=$(grep -E '^\s*to\s+[a-zA-Z0-9.-]+:[0-9]+' "$CADDYFILE" | awk '{print $2}' | cut -d: -f1)
@@ -64,18 +64,18 @@ for host in $hosts; do
     
     # Connexion SSH non interactive (sauf mot de passe s'il n'y a pas de clés SSH configurées)
     if ssh -o ConnectTimeout=5 -o BatchMode=no "${SSH_USER}@${host}" "${remote_cmd}"; then
-        echo -e "\n${GREEN}✅ Déploiement réussi sur $host !${NC}"
+        echo -e "\n${GREEN} Déploiement réussi sur $host !${NC}"
     else
-        echo -e "\n${RED}❌ ÉCHEC du déploiement sur $host !${NC}"
+        echo -e "\n${RED} ÉCHEC du déploiement sur $host !${NC}"
         has_error=1
     fi
 done
 
 echo -e "\n${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 if [ $has_error -eq 0 ]; then
-    echo -e "${GREEN}${BOLD}🎉 Déploiement de la flotte terminé avec SUCCÈS sur tous les hôtes !${NC}"
+    echo -e "${GREEN}${BOLD} Déploiement de la flotte terminé avec SUCCÈS sur tous les hôtes !${NC}"
     exit 0
 else
-    echo -e "${RED}${BOLD}⚠️ Le déploiement s'est terminé avec des erreurs sur certains hôtes.${NC}"
+    echo -e "${RED}${BOLD} Le déploiement s'est terminé avec des erreurs sur certains hôtes.${NC}"
     exit 1
 fi
