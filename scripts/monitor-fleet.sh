@@ -23,7 +23,7 @@ if [ ! -f "$CADDYFILE" ]; then
     exit 1
 fi
 
-echo -e "${BOLD}${BLUE}🔍 Extraction des nœuds actifs de la flotte depuis $CADDYFILE...${NC}"
+echo -e "${BOLD}${BLUE} Extraction des nœuds actifs de la flotte depuis $CADDYFILE...${NC}"
 
 # Extrait les lignes "to <adresse>:<port>" (non commentées)
 nodes=$(grep -E '^\s*to\s+[a-zA-Z0-9.-]+:[0-9]+' "$CADDYFILE" | awk '{print $2}')
@@ -71,16 +71,16 @@ for node in $nodes; do
     if [ "$http_status" = "200" ]; then
         # Check si c'est du JSON valide et s'il y a un statut dégradé
         if echo "$body" | grep -q "degraded"; then
-            echo -e "║  ⚠️  ${YELLOW}%-25s${NC} | status: DEGRADED | ${latency}ms\n║      -> DMR local injoignable !"
+            echo -e "║  ${YELLOW}%-25s${NC} | status: DEGRADED | ${latency}ms\n║      -> DMR local injoignable !"
             has_error=1
         else
-            echo -e "║  ✅  ${GREEN}%-25s${NC} | status: OK       | ${latency}ms" | sed "s/%-25s/$(printf '%-25s' "$node")/"
+            echo -e "║  ${GREEN}%-25s${NC} | status: OK       | ${latency}ms" | sed "s/%-25s/$(printf '%-25s' "$node")/"
         fi
     elif [ -z "$http_status" ] || [ "$http_status" = "000" ]; then
-        echo -e "║  ❌  ${RED}%-25s${NC} | status: TIMEOUT  | >2500ms\n║      -> Service docverify injoignable (éteint ou problème réseau)" | sed "s/%-25s/$(printf '%-25s' "$node")/"
+        echo -e "║  ${RED}%-25s${NC} | status: TIMEOUT  | >2500ms\n║      -> Service docverify injoignable (éteint ou problème réseau)" | sed "s/%-25s/$(printf '%-25s' "$node")/"
         has_error=1
     else
-        echo -e "║  ❌  ${RED}%-25s${NC} | status: HTTP %-3s | ${latency}ms\n║      -> %s" | sed -e "s/%-25s/$(printf '%-25s' "$node")/" -e "s/%-3s/$http_status/" -e "s/%s/$body/"
+        echo -e "║  ${RED}%-25s${NC} | status: HTTP %-3s | ${latency}ms\n║      -> %s" | sed -e "s/%-25s/$(printf '%-25s' "$node")/" -e "s/%-3s/$http_status/" -e "s/%s/$body/"
         has_error=1
     fi
 done
@@ -88,9 +88,9 @@ done
 echo -e "╚═══════════════════════════════════════════════════════════════════╝"
 
 if [ $has_error -eq 0 ]; then
-    echo -e "\n${GREEN}${BOLD}✅ Tous les nœuds de la flotte sont opérationnels et les DMR sont fonctionnels.${NC}"
+    echo -e "\n${GREEN}${BOLD} Tous les nœuds de la flotte sont opérationnels et les DMR sont fonctionnels.${NC}"
     exit 0
 else
-    echo -e "\n${RED}${BOLD}❌ Problèmes détectés sur un ou plusieurs nœuds de la flotte.${NC}"
+    echo -e "\n${RED}${BOLD} Problèmes détectés sur un ou plusieurs nœuds de la flotte.${NC}"
     exit 1
 fi
