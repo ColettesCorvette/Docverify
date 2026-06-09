@@ -30,7 +30,7 @@ Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker
 ### Production / Flotte Multi-nœuds (Shared-Nothing)
 En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy**, dont la configuration est régénérée dynamiquement par le **Registre de flotte** centralisé à chaque signal de heartbeat d'un nœud actif :
 
-![Infrastructure de Flotte](assets/infrastructure_production.svg)
+<img src="assets/infrastructure_production.svg" width="450" alt="Infrastructure de Flotte" />
 
 ## Briques externes
 
