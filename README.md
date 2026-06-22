@@ -28,7 +28,7 @@ Le schéma ci-dessous illustre le fonctionnement sur une machine de développeme
 Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
 
 ### Production / Flotte Multi-nœuds (Shared-Nothing)
-En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy**, dont la configuration est régénérée dynamiquement par le **Registre de flotte** centralisé à chaque signal de heartbeat d'un nœud actif :
+En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy** dont la configuration est **statique** (`Caddyfile` versionné, une ligne `to <IP>:8680` par Mac). Un nœud HS est retiré tout seul de la rotation par le **health-check actif** `/health` :
 
 ![Infrastructure de Flotte](assets/infrastructure_production.svg)
 
