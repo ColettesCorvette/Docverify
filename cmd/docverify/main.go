@@ -13,20 +13,6 @@ import (
 // ── Point d'entrée ────────────────────────────────────────────────────────────
 
 func main() {
-	// Mode registre dynamique : par argument --registry ou variable d'env
-	if regPort := os.Getenv("DOCVERIFY_REGISTRY_PORT"); regPort != "" {
-		dc.StartRegistry(regPort)
-		return
-	}
-	if len(os.Args) >= 2 && (os.Args[1] == "--registry" || os.Args[1] == "-registry") {
-		port := "8681"
-		if len(os.Args) >= 3 {
-			port = os.Args[2]
-		}
-		dc.StartRegistry(port)
-		return
-	}
-
 	if len(os.Args) < 2 {
 		// Pas d'argument → mode serveur API
 		dc.StartServer()

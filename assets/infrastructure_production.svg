@@ -21,11 +21,7 @@
       <stop offset="0%" stop-color="#ec4899" />
       <stop offset="100%" stop-color="#db2777" />
     </linearGradient>
-    <linearGradient id="reg-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#8b5cf6" />
-      <stop offset="100%" stop-color="#6d28d9" />
-    </linearGradient>
-    
+
     <!-- Drop Shadows -->
     <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
       <feDropShadow dx="0" dy="4" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
@@ -37,14 +33,14 @@
 
   <!-- Title -->
   <text x="425" y="35" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="bold" fill="#f8fafc" text-anchor="middle">
-    Infrastructure Réelle de Flotte (Shared-Nothing)
+    Flotte docverify — Mac Minis autonomes, LB Caddy statique
   </text>
   <text x="425" y="55" font-family="system-ui, -apple-system, sans-serif" font-size="13" fill="#94a3b8" text-anchor="middle">
-    Macs autonomes avec k3d locaux, équilibrés par Caddy via un registre dynamique
+    Un cluster k3d + Docker Model Runner (Metal) par machine, aucun état partagé
   </text>
 
   <!-- Client / Regia (Left) -->
-  <g transform="translate(20, 240)" filter="url(#shadow)">
+  <g transform="translate(20, 260)" filter="url(#shadow)">
     <rect width="110" height="80" rx="8" fill="#475569" stroke="#64748b" stroke-width="2" />
     <text x="55" y="40" font-family="system-ui, sans-serif" font-size="15" font-weight="bold" fill="#f8fafc" text-anchor="middle">Back-Office</text>
     <text x="55" y="60" font-family="system-ui, sans-serif" font-size="13" fill="#cbd5e1" text-anchor="middle">Regia</text>
@@ -52,39 +48,24 @@
 
   <!-- Flow Arrow Regia -> LB -->
   <g stroke="#94a3b8" stroke-width="2" fill="none">
-    <path d="M 130 280 L 175 280" />
-    <polygon points="175,280 167,275 167,285" fill="#94a3b8" stroke="none" />
+    <path d="M 130 300 L 175 300" />
+    <polygon points="175,300 167,295 167,305" fill="#94a3b8" stroke="none" />
   </g>
 
   <!-- Load Balancer Caddy (Middle-Left) -->
-  <g transform="translate(180, 150)" filter="url(#shadow)">
+  <g transform="translate(180, 245)" filter="url(#shadow)">
     <rect width="130" height="110" rx="8" fill="url(#lb-grad)" stroke="#f472b6" stroke-width="1.5" />
     <text x="65" y="35" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Load Balancer</text>
     <text x="65" y="60" font-family="system-ui, sans-serif" font-size="18" font-weight="bold" fill="#ffffff" text-anchor="middle">Caddy</text>
-    <text x="65" y="90" font-family="monospace" font-size="12" fill="#fdf2f8" text-anchor="middle">Port :8680</text>
+    <text x="65" y="90" font-family="monospace" font-size="12" fill="#fdf2f8" text-anchor="middle">Port :8080</text>
   </g>
-
-  <!-- Registre Central (Bottom-Left) -->
-  <g transform="translate(180, 310)" filter="url(#shadow)">
-    <rect width="130" height="110" rx="8" fill="url(#reg-grad)" stroke="#a78bfa" stroke-width="1.5" />
-    <text x="65" y="35" font-family="system-ui, sans-serif" font-size="14" font-weight="bold" fill="#ffffff" text-anchor="middle">Registre Flotte</text>
-    <text x="65" y="60" font-family="system-ui, sans-serif" font-size="16" font-weight="bold" fill="#ffffff" text-anchor="middle">docverify --registry</text>
-    <text x="65" y="90" font-family="monospace" font-size="12" fill="#f5f3ff" text-anchor="middle">Port :8681</text>
-  </g>
-
-  <!-- Relation Registre -> Caddyfile -> LB -->
-  <g stroke="#a78bfa" stroke-width="1.5" fill="none">
-    <path d="M 245 310 L 245 260" />
-    <polygon points="245,260 241,268 249,268" fill="#a78bfa" stroke="none" />
-  </g>
-  <text x="252" y="290" font-family="system-ui, sans-serif" font-size="10" fill="#a78bfa">Génère Caddyfile</text>
 
   <!-- Connections LB -> Macs physical ports -->
   <g stroke="#ec4899" stroke-width="1.5" stroke-dasharray="4" fill="none">
-    <path d="M 310 205 L 360 205 L 360 170 L 400 170" />
+    <path d="M 310 300 L 360 300 L 360 170 L 400 170" />
     <polygon points="400,170 392,166 392,174" fill="#ec4899" stroke="none" />
 
-    <path d="M 310 205 L 360 205 L 360 390 L 400 390" />
+    <path d="M 310 300 L 360 300 L 360 390 L 400 390" />
     <polygon points="400,390 392,386 392,394" fill="#ec4899" stroke="none" />
   </g>
   <text x="365" y="155" font-family="system-ui, sans-serif" font-size="9" fill="#f472b6">HTTP :8680</text>
@@ -180,16 +161,12 @@
     </g>
   </g>
 
-  <!-- Heartbeat path (Pods -> Registry) -->
-  <g stroke="#a78bfa" stroke-width="1" stroke-dasharray="2" fill="none">
-    <!-- Mac 1 Pods -> Registry -->
-    <path d="M 420 180 L 330 180 L 330 365 L 310 365" />
-    <polygon points="310,365 318,361 318,369" fill="#a78bfa" stroke="none" />
-    
-    <!-- Mac 2 Pods -> Registry -->
-    <path d="M 420 410 L 330 410 L 330 365 L 310 365" />
-    <polygon points="310,365 318,361 318,369" fill="#a78bfa" stroke="none" />
+  <!-- Légende : éjection auto par health-check actif -->
+  <g transform="translate(20, 430)">
+    <circle cx="6" cy="6" r="5" fill="none" stroke="#34d399" stroke-width="2" />
+    <path d="M 3.5 6 L 5.5 8.5 L 9 4" fill="none" stroke="#34d399" stroke-width="1.5" />
+    <text x="18" y="10" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">Caddy sonde /health (5s) — un Mac HS</text>
+    <text x="18" y="25" font-family="system-ui, sans-serif" font-size="11" fill="#94a3b8">sort tout seul de la rotation</text>
   </g>
-  <text x="340" y="340" font-family="system-ui, sans-serif" font-size="8" fill="#c084fc" text-anchor="middle" transform="rotate(-90 340 340)">Heartbeat /register</text>
 
 </svg>

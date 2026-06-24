@@ -1,30 +1,27 @@
-# LB de flotte docverify, phase 2 shared-nothing.
-#
-# Repartit le trafic HTTP entrant de Regia sur les unites docverify autonomes,
-# une par Mac. Chaque upstream est le :8680 publie par k3d sur le LAN du Mac.
-# Le LB ne touche jamais aux DMR : chaque Mac parle a son DMR Metal local.
-#
-# Health-check actif sur /health : un Mac dont docverify ou le DMR local est
-# tombe sort automatiquement de la rotation. C'est ce qui couvre le GPU hang.
+# LB de flotte docverify, shared-nothing. Fichier STATIQUE, source de vérité,
+# édité à la main. Une ligne `to <IP>:8680` par Mac (IP DHCP-réservées).
+# Un Mac down ou au DMR hangé sort tout seul de la rotation via le
+# health-check actif /health. Ajout/retrait d'un Mac : éditer ce fichier
+# puis `caddy reload --config deploy/fleet/Caddyfile`.
 #
 # Lancer sur le Mac principal ou un hote front :
-#   docker run -d --name docverify-lb -p 8680:8680 \
+#   docker run -d --name docverify-lb -p 8080:8080 \
 #     -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
 # ou en local : caddy run --config deploy/fleet/Caddyfile
 {
-	admin off
+	# Admin sur loopback uniquement : permet `caddy reload`/`caddy stop`
+	# (rechargement à chaud lors d'un ajout/retrait de Mac) sans exposer
+	# de surface réseau. NE PAS binder sur 0.0.0.0.
+	admin localhost:2019
 }
 
-:8680 {
+:8080 {
 	reverse_proxy {
-		# Une ligne par Mac de la flotte, a renseigner selon l'environnement.
-		# Les IP ne sont pas stables tant que les Macs ne sont pas en place :
-		# prevoir une reservation DHCP par Mac, ou des noms .local si le reseau
-		# resout le Bonjour, plutot que des IP en dur sujettes a changer.
-		to 192.168.30.42:8680
-		# to 192.168.30.xxx:8680
-		# to 192.168.30.xxx:8680
-		# to 192.168.30.xxx:8680
+		# Une ligne par Mac de la flotte (IP DHCP-réservées). Ajout/retrait :
+		# éditer ces lignes puis `caddy reload`.
+		to 10.40.1.10:8680
+		to 10.40.1.11:8680
+		to 10.40.1.12:8680
 
 		lb_policy least_conn
 
