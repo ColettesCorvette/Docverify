@@ -1,0 +1,8 @@
+mirrors:
+  "alpha.srv.orbinea:5000":
+    endpoint:
+      - "https://alpha.srv.orbinea:5000"
+configs:
+  "alpha.srv.orbinea:5000":
+    tls:
+      ca_file: /etc/ssl/certs/rhea-ca.crt
