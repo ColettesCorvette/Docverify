@@ -23,21 +23,14 @@ Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 
 ### Développement Local (k3d mono-nœud)
 Le schéma ci-dessous illustre le fonctionnement sur une machine de développement unique. Les pods `docverify` s'exécutent dans un cluster local `k3d` et atteignent le **Docker Model Runner (DMR)** s'exécutant sur l'hôte pour utiliser le GPU Metal du Mac :
 
-<img src="assets/pipeline_cascade.svg" width="450" alt="Architecture locale" />
+<img src="assets/pipeline_cascade.svg" width="650" alt="Architecture locale" />
 
 Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
 
 ### Production / Flotte Multi-nœuds (Shared-Nothing)
 En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy** dont la configuration est **statique** (`Caddyfile` versionné, une ligne `to <IP>:8680` par Mac). Un nœud HS est retiré tout seul de la rotation par le **health-check actif** `/health` :
 
-![Infrastructure de Flotte](assets/infrastructure_production.svg)
-
-### Modèle de Données & Structures Go
-Le schéma suivant montre l'organisation des principales structures de données du projet, leurs relations (mode unitaire vs mode batch) et l'intégration avec la queue de travail et l'analyse 2D-DOC :
-
-![Diagramme des Structures Go](assets/diagramme_structures_go.svg)
-
-
+<img src="assets/infrastructure_production.svg" width="650" alt="Infrastructure de Flotte" />
 
 ## Briques externes
 
@@ -110,5 +103,3 @@ Le détail de chaque script et de sa configuration est sur la page [Scripts](htt
 Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM en shared-nothing (un nœud k3d autonome + DMR local par machine).
 
 Pour s'adapter aux Mac workers de 24 Go de RAM, le modèle vision-langage de production est quantisé en `Q4_K_M` (4.62 GiB), ce qui libère 3 Go de VRAM par nœud tout en conservant une justesse de 100% au benchmark. Le système supporte les rafales de charge intense (ex: 12 requêtes simultanées) sans crash ni timeout grâce au découplage du cycle de vie des tâches (timeout d'attente court en file et timeout d'exécution garanti pour le worker).
-
-La mise à l'échelle vers un vrai cluster Kubernetes multi-nœuds (lima + k3s) a été scriptée mais est conservée en option pour éviter la perte de 4 Go de RAM par VM Linux sur les workers de 24 Go. Le déploiement par défaut reste la topologie shared-nothing orchestrée à distance par les scripts d'administration.
