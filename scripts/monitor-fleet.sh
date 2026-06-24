@@ -71,7 +71,7 @@ for node in $nodes; do
     if [ "$http_status" = "200" ]; then
         # Check si c'est du JSON valide et s'il y a un statut dégradé
         if echo "$body" | grep -q "degraded"; then
-            echo -e "║  ${YELLOW}%-25s${NC} | status: DEGRADED | ${latency}ms\n║      -> DMR local injoignable !"
+            echo -e "║  ${YELLOW}%-25s${NC} | status: DEGRADED | ${latency}ms\n║      -> DMR local injoignable !" | sed "s/%-25s/$(printf '%-25s' "$node")/"
             has_error=1
         else
             echo -e "║  ${GREEN}%-25s${NC} | status: OK       | ${latency}ms" | sed "s/%-25s/$(printf '%-25s' "$node")/"
