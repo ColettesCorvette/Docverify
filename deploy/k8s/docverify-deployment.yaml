@@ -16,8 +16,8 @@ spec:
     spec:
       containers:
       - name: docverify
-        image: docverify-docverify:latest
-        imagePullPolicy: Never
+        image: alpha.srv.orbinea:5000/docverify:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 8680
           name: http

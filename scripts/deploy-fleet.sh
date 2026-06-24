@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 #
 # scripts/deploy-fleet.sh
-# Déploie la nouvelle version de docverify sur l'ensemble de la flotte via SSH.
-# Extrait automatiquement les nœuds actifs depuis le Caddyfile.
+# Déploie docverify sur toute la flotte via le registre interne.
+#
+# Modèle : on build + push l'image UNE fois ici (Mac de contrôle) vers le
+# registre interne. Chaque nœud a un k3d configuré pour pull depuis ce registre
+# (imagePullPolicy: Always) ; déployer = déclencher un `kubectl rollout restart`
+# par nœud, k3d re-pull l'image. Aucun transfert d'image par SSH, aucun git ni
+# build côté nœud.
+#
+# Nœuds extraits du Caddyfile (source de vérité de la flotte). Compte SSH commun
+# `fleet` sur tous les Macs (overridable via SSH_USER ; vide => ~/.ssh/config).
 #
 
 set -euo pipefail
+
+# Charge la config centrale si un .env racine existe (cf. .env.example).
+ENV_FILE="$(cd "$(dirname "$0")/.." && pwd)/.env"
+if [ -f "$ENV_FILE" ]; then set -a; . "$ENV_FILE"; set +a; fi
 
 # Couleurs
 GREEN='\033[0;32m'
@@ -16,17 +28,29 @@ NC='\033[0m'
 BOLD='\033[1m'
 
 CADDYFILE="deploy/fleet/Caddyfile"
-PROJECT_DIR="${PROJECT_DIR:-~/Desktop/LLM/ocr/docverify}"
-SSH_USER="${SSH_USER:-$USER}"
+REGISTRY="${REGISTRY:-alpha.srv.orbinea:5000}"
+IMAGE_NAME="${IMAGE_NAME:-docverify}"
+TAG="${TAG:-latest}"
+# ponytail: tag :latest mutable, suffisant avec imagePullPolicy:Always + rollout
+# restart. Passer à un tag par sha git (TAG=$(git rev-parse --short HEAD)) si on
+# veut des rollbacks déterministes.
+REGISTRY_IMAGE="$REGISTRY/$IMAGE_NAME:$TAG"
+DEPLOY="${DEPLOY:-docverify}"
+# Compte macOS standard de la flotte (celui qui fait tourner Docker Desktop sur
+# chaque Mac). Overridable : SSH_USER=xxx ./scripts/deploy-fleet.sh
+# Transition : SSH_USER= (vide) → on SSH par host seul, ~/.ssh/config choisit le
+# user par Mac (utile tant que les nœuds actuels ne sont pas standardisés `fleet`).
+SSH_USER="${SSH_USER-fleet}"
+
+cd "$(dirname "$0")/.."
 
 if [ ! -f "$CADDYFILE" ]; then
     echo -e "${RED}Erreur : Caddyfile introuvable à l'emplacement $CADDYFILE${NC}"
     exit 1
 fi
 
-echo -e "${BOLD}${BLUE} Préparation du déploiement de la flotte depuis $CADDYFILE...${NC}"
-
-# Extrait les hôtes actifs (on ne garde que l'IP/hostname sans le port :8680)
+# Extrait les hôtes actifs (IP/hostname sans le port :8680). Ignore les lignes
+# commentées (grep ancré sur `to` en début de ligne, après espaces).
 hosts=$(grep -E '^\s*to\s+[a-zA-Z0-9.-]+:[0-9]+' "$CADDYFILE" | awk '{print $2}' | cut -d: -f1)
 
 if [ -z "$hosts" ]; then
@@ -34,13 +58,17 @@ if [ -z "$hosts" ]; then
     exit 0
 fi
 
-echo -e "${BOLD}Hôtes cibles détectés :${NC}"
+echo -e "${BOLD}${BLUE}Build + push de l'image (une fois) : $REGISTRY_IMAGE${NC}"
+docker build -f deploy/Dockerfile -t "$REGISTRY_IMAGE" .
+docker push "$REGISTRY_IMAGE"
+
+echo -e "\n${BOLD}Hôtes cibles détectés :${NC}"
 for host in $hosts; do
-    echo "  - $host (SSH user: $SSH_USER)"
+    echo "  - $host (SSH user: ${SSH_USER:-via ~/.ssh/config})"
 done
 echo ""
 
-read -p "Voulez-vous lancer le déploiement sur ces hôtes ? (o/N) " -n 1 -r
+read -p "Lancer le rollout sur ces hôtes ? (o/N) " -n 1 -r
 echo ""
 if [[ ! $REPLY =~ ^[Oo]$ ]]; then
     echo -e "${YELLOW}Déploiement annulé.${NC}"
@@ -51,31 +79,35 @@ has_error=0
 
 for host in $hosts; do
     echo -e "\n${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
-    echo -e "${BOLD}Déploiement sur : $host...${NC}"
+    echo -e "${BOLD}Rollout sur : $host...${NC}"
     echo -e "${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
-    
-    # Commande à exécuter sur le nœud distant
-    # 1. Aller dans le projet
-    # 2. Mettre à jour avec git pull
-    # 3. Exécuter redeploy.sh en sautant la validation go build si Go n'est pas présent
-    remote_cmd="cd $PROJECT_DIR && \
-                echo '=== git pull ===' && git pull && \
-                echo '=== redeploy ===' && SKIP_GOBUILD=1 ./scripts/redeploy.sh"
-    
-    # Connexion SSH non interactive (sauf mot de passe s'il n'y a pas de clés SSH configurées)
-    if ssh -o ConnectTimeout=5 -o BatchMode=no "${SSH_USER}@${host}" "${remote_cmd}"; then
-        echo -e "\n${GREEN} Déploiement réussi sur $host !${NC}"
+
+    # Cible SSH : user explicite si SSH_USER posé, sinon host seul (~/.ssh/config
+    # résout le user par Mac — utile en transition avant standardisation `fleet`).
+    target="${host}"
+    [ -n "$SSH_USER" ] && target="${SSH_USER}@${host}"
+
+    # Commande distante : k3d re-pull l'image depuis le registre via le rollout.
+    # Le node ne fait NI git NI build NI réception d'image — il pull tout seul.
+    # brew shellenv : un shell SSH non-login n'a pas /opt/homebrew/bin dans le
+    # PATH, sans ça kubectl ressort en 'command not found'.
+    remote_cmd="set -e; \
+        eval \"\$(/opt/homebrew/bin/brew shellenv)\"; \
+        echo '=== rollout ==='; kubectl rollout restart deploy/'$DEPLOY'; \
+        kubectl rollout status deploy/'$DEPLOY' --timeout=120s"
+
+    if ssh -o ConnectTimeout=5 -o BatchMode=no "$target" "$remote_cmd"; then
+        echo -e "\n${GREEN} Rollout réussi sur $host !${NC}"
     else
-        echo -e "\n${RED} ÉCHEC du déploiement sur $host !${NC}"
+        echo -e "\n${RED} ÉCHEC du rollout sur $host !${NC}"
         has_error=1
     fi
 done
 
 echo -e "\n${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
-if [ $has_error -eq 0 ]; then
-    echo -e "${GREEN}${BOLD} Déploiement de la flotte terminé avec SUCCÈS sur tous les hôtes !${NC}"
-    exit 0
+if [ "$has_error" -eq 0 ]; then
+    echo -e "${GREEN}Déploiement terminé sur toute la flotte.${NC}"
 else
-    echo -e "${RED}${BOLD} Le déploiement s'est terminé avec des erreurs sur certains hôtes.${NC}"
-    exit 1
+    echo -e "${YELLOW}Déploiement terminé avec des erreurs sur certains hôtes.${NC}"
 fi
+exit "$has_error"
