@@ -110,7 +110,7 @@ func StartServer() {
 
 // makeHealthHandler renvoie le handler de /health, enrichi des métriques de la
 // queue (workers, profondeur, in-flight) et d'infos de build, pour alimenter le
-// dashboard de monitoring de la flotte. Le code HTTP reste 200 (ok) / 503
+// dashboard de monitoring du cluster. Le code HTTP reste 200 (ok) / 503
 // (degraded, LLM injoignable) — la readinessProbe k8s s'en sert.
 func makeHealthHandler(q *Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {

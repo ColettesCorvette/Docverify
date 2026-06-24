@@ -6,11 +6,11 @@
 #
 # Pourquoi un override local : le manifest versionné cible le registre interne
 # (alpha.srv.orbinea:5000/docverify:latest, imagePullPolicy Always) — c'est la
-# config de la FLOTTE. En dev on NE passe PAS par le registre : on build en
+# config du cluster. En dev on NE passe PAS par le registre : on build en
 # local, on importe l'image dans k3d, et on patche le Deployment pour qu'il
 # utilise l'image locale en Never. Ça garde la boucle de dev rapide et isolée,
-# sans polluer le tag :latest que la flotte tire. Pour déployer sur la flotte,
-# voir scripts/deploy-fleet.sh.
+# sans polluer le tag :latest que le cluster tire. Pour déployer sur le cluster,
+# voir scripts/deploy-cluster.sh.
 #
 # Variables d'env :
 #   IMAGE        — tag de l'image LOCALE (défaut : docverify-docverify:latest)

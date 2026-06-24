@@ -15,7 +15,7 @@
 # Important : ces images ciblent du linux/amd64 et un accélérateur précis. Les
 # construire et les tester sur la machine cible ou un CI à l'architecture
 # correspondante, pas sur un Mac Apple Silicon. macOS n'est pas concerné : la
-# flotte Mac sert le LLM via Docker Model Runner, pas vLLM.
+# cluster Mac sert le LLM via Docker Model Runner, pas vLLM.
 
 set -euo pipefail
 cd "$(dirname "$0")"

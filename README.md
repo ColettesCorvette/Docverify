@@ -27,10 +27,10 @@ Le schéma ci-dessous illustre le fonctionnement sur une machine de développeme
 
 Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
 
-### Production / Flotte Multi-nœuds (Shared-Nothing)
-En production, la flotte est distribuée sur plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*). Chaque machine physique fait tourner son propre cluster `k3d` local (contenant les pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). Les requêtes de production sont réparties par un Load Balancer **Caddy** dont la configuration est **statique** (`Caddyfile` versionné, une ligne `to <IP>:8680` par Mac). Un nœud HS est retiré tout seul de la rotation par le **health-check actif** `/health` :
+### Production / Cluster Multi-nœuds (Shared-Nothing)
+En production, le cluster regroupe plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*) — Mac principal inclus, qui sert aussi de worker. Chaque machine fait tourner son propre cluster `k3d` local (pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). L'image docverify est buildée une fois et poussée sur un **registre interne** (`alpha.srv.orbinea:5000`) ; chaque k3d la **pull** (`imagePullPolicy: Always`). Les requêtes sont réparties par un Load Balancer **Caddy** à configuration **statique** (`Caddyfile` versionné, une ligne `to <IP>:8680` par Mac). Un nœud HS est retiré tout seul de la rotation par le **health-check actif** `/health` :
 
-<img src="assets/infrastructure_production.svg" width="650" alt="Infrastructure de Flotte" />
+<img src="assets/infrastructure_production.svg" width="650" alt="Infrastructure du cluster" />
 
 ## Briques externes
 
@@ -61,15 +61,16 @@ La route, ses champs et le mode webhook sont décrits dans le wiki, page [API HT
 
 ## Déployer
 
-Le backend LLM est Docker Model Runner, activé dans Docker Desktop avec le support TCP host-side. On récupère le modèle une fois, puis le déploiement tient en un manifeste et un script.
+Le backend LLM est Docker Model Runner, activé dans Docker Desktop avec le support TCP host-side. On récupère le modèle une fois par Mac, puis deux chemins de déploiement selon la cible.
 
 ```bash
-docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une fois
-kubectl apply -f deploy/k8s/docverify-deployment.yaml   # service docverify et ses replicas
-./scripts/redeploy.sh                                  # rebuild, import et rollout après une modif Go
+docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une fois par Mac
+
+./scripts/redeploy.sh         # DEV LOCAL : build + import k3d + override local (sans registre)
+./scripts/deploy-cluster.sh   # CLUSTER : build + push registre, puis rollout de chaque nœud
 ```
 
-Les pods atteignent le runner via la passerelle hôte `192.168.65.254:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
+Le manifeste `deploy/k8s/docverify-deployment.yaml` cible l'image du registre interne (`imagePullPolicy: Always`). Un Mac neuf se provisionne avec `deploy/cluster/provision-node-registry.sh` (config registre + cluster k3d + `kubectl apply`), puis on l'ajoute au `Caddyfile`. Les pods atteignent le runner via la passerelle hôte `192.168.65.254:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
 
 ## Documentation
 
@@ -89,9 +90,10 @@ Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. 
 | `test-api.sh` | Suite de tests HTTP contre les samples, un cas ou tous |
 | `concurrency-test.sh` | Rafale parallèle, garde anti-régression de la contamination |
 | `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring contre le groundtruth |
-| `redeploy.sh` | Rebuild image, import k3d et rollout docverify |
-| `monitor-fleet.sh` | [NOUVEAU] Monitor de santé HTTP de tous les nœuds de la flotte |
-| `deploy-fleet.sh` | [NOUVEAU] Script pour automatiser les déploiements Git+Redeploy à distance via SSH |
+| `redeploy.sh` | Dev local : build + import k3d + override local du Deployment (image locale, sans toucher au registre) |
+| `deploy-cluster.sh` | Déploie le cluster : build + push de l'image sur le registre interne, puis `rollout restart` de chaque nœud via SSH (k3d pull) |
+| `monitor-cluster.sh` | Dashboard temps réel de la santé du cluster (`/health` enrichi : status, LLM, workers, queue, in-flight, version) |
+| `provision-node-registry.sh` | Provisionne le k3d d'un Mac pour pull depuis le registre (recrée le cluster avec la config registre rhea) |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
 
 Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh`.
@@ -100,6 +102,6 @@ Le détail de chaque script et de sa configuration est sur la page [Scripts](htt
 
 ## Machines
 
-Le développement se fait sur un Mac Mini M4 Pro, 12 cœurs et 48 Go de mémoire unifiée. Trois Mac Mini supplémentaires, mêmes M4 Pro 12 cœurs avec 24 Go chacun, répartissent la charge du LLM en shared-nothing (un nœud k3d autonome + DMR local par machine).
+Le cluster est composé de quatre Mac Mini M4 Pro 12 cœurs en shared-nothing (un nœud k3d autonome + DMR local par machine). Le Mac principal (48 Go de mémoire unifiée) sert à la fois de poste de développement, de front Load Balancer **et** de worker. Trois Mac Mini supplémentaires (24 Go chacun) complètent le cluster.
 
 Pour s'adapter aux Mac workers de 24 Go de RAM, le modèle vision-langage de production est quantisé en `Q4_K_M` (4.62 GiB), ce qui libère 3 Go de VRAM par nœud tout en conservant une justesse de 100% au benchmark. Le système supporte les rafales de charge intense (ex: 12 requêtes simultanées) sans crash ni timeout grâce au découplage du cycle de vie des tâches (timeout d'attente court en file et timeout d'exécution garanti pour le worker).

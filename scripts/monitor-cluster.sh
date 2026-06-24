@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# scripts/monitor-fleet.sh
-# Dashboard temps réel de la santé de la flotte docverify.
+# scripts/monitor-cluster.sh
+# Dashboard temps réel de la santé du cluster docverify.
 # Nœuds extraits du Caddyfile du Load Balancer. Sonde /health de chaque nœud
 # (status, LLM, workers, queue, in-flight, version, uptime) et, si le LB tourne
 # localement, la distribution des requêtes en cours par backend.
 #
 # Usage :
-#   ./scripts/monitor-fleet.sh            # dashboard live, refresh 2s (Ctrl-C pour quitter)
-#   ./scripts/monitor-fleet.sh 5          # live, refresh 5s
-#   ./scripts/monitor-fleet.sh --once     # snapshot unique + code retour (0 ok / 1 souci) pour CI
+#   ./scripts/monitor-cluster.sh            # dashboard live, refresh 2s (Ctrl-C pour quitter)
+#   ./scripts/monitor-cluster.sh 5          # live, refresh 5s
+#   ./scripts/monitor-cluster.sh --once     # snapshot unique + code retour (0 ok / 1 souci) pour CI
 #
 # Prérequis : jq.
 
@@ -18,7 +18,7 @@ set -uo pipefail
 GREEN='\033[0;32m'; RED='\033[0;31m'; YELLOW='\033[0;33m'
 BLUE='\033[0;34m'; CYAN='\033[0;36m'; DIM='\033[2m'; BOLD='\033[1m'; NC='\033[0m'
 
-CADDYFILE="${CADDYFILE:-deploy/fleet/Caddyfile}"
+CADDYFILE="${CADDYFILE:-deploy/cluster/Caddyfile}"
 LB_CONTAINER="${LB_CONTAINER:-docverify-lb}"
 
 INTERVAL=0.5
@@ -113,7 +113,7 @@ render() {
 	local total; total=$(echo "$nodes" | wc -w | tr -d ' ')
 
 	printf '\033[H'  # home (pas de clear total → refresh en place, sans flicker)
-	echo -e "${BOLD}${BLUE}  DASHBOARD FLOTTE docverify${NC}   ${DIM}$(date '+%Y-%m-%d %H:%M:%S')   refresh ${INTERVAL}s   Ctrl-C pour quitter${NC}${EOL}"
+	echo -e "${BOLD}${BLUE}  DASHBOARD CLUSTER docverify${NC}   ${DIM}$(date '+%Y-%m-%d %H:%M:%S')   refresh ${INTERVAL}s   Ctrl-C pour quitter${NC}${EOL}"
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
 	printf "${BOLD}%-18s  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${NC}${EOL}\n" \
 		"NŒUD" "STATUS" "LLM" "LATENCE" "INFLT/WK" "QUEUE/CAP" "VERSION" "UPTIME"

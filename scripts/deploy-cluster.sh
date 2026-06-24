@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# scripts/deploy-fleet.sh
-# Déploie docverify sur toute la flotte via le registre interne.
+# scripts/deploy-cluster.sh
+# Déploie docverify sur tout le cluster via le registre interne.
 #
 # Modèle : on build + push l'image UNE fois ici (Mac de contrôle) vers le
 # registre interne. Chaque nœud a un k3d configuré pour pull depuis ce registre
@@ -9,8 +9,8 @@
 # par nœud, k3d re-pull l'image. Aucun transfert d'image par SSH, aucun git ni
 # build côté nœud.
 #
-# Nœuds extraits du Caddyfile (source de vérité de la flotte). Compte SSH commun
-# `fleet` sur tous les Macs (overridable via SSH_USER ; vide => ~/.ssh/config).
+# Nœuds extraits du Caddyfile (source de vérité du cluster). Compte SSH commun
+# `cluster` sur tous les Macs (overridable via SSH_USER ; vide => ~/.ssh/config).
 #
 
 set -euo pipefail
@@ -27,7 +27,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 BOLD='\033[1m'
 
-CADDYFILE="deploy/fleet/Caddyfile"
+CADDYFILE="deploy/cluster/Caddyfile"
 REGISTRY="${REGISTRY:-alpha.srv.orbinea:5000}"
 IMAGE_NAME="${IMAGE_NAME:-docverify}"
 TAG="${TAG:-latest}"
@@ -36,11 +36,11 @@ TAG="${TAG:-latest}"
 # veut des rollbacks déterministes.
 REGISTRY_IMAGE="$REGISTRY/$IMAGE_NAME:$TAG"
 DEPLOY="${DEPLOY:-docverify}"
-# Compte macOS standard de la flotte (celui qui fait tourner Docker Desktop sur
-# chaque Mac). Overridable : SSH_USER=xxx ./scripts/deploy-fleet.sh
+# Compte macOS standard du cluster (celui qui fait tourner Docker Desktop sur
+# chaque Mac). Overridable : SSH_USER=xxx ./scripts/deploy-cluster.sh
 # Transition : SSH_USER= (vide) → on SSH par host seul, ~/.ssh/config choisit le
-# user par Mac (utile tant que les nœuds actuels ne sont pas standardisés `fleet`).
-SSH_USER="${SSH_USER-fleet}"
+# user par Mac (utile tant que les nœuds actuels ne sont pas standardisés `cluster`).
+SSH_USER="${SSH_USER-cluster}"
 
 cd "$(dirname "$0")/.."
 
@@ -83,7 +83,7 @@ for host in $hosts; do
     echo -e "${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 
     # Cible SSH : user explicite si SSH_USER posé, sinon host seul (~/.ssh/config
-    # résout le user par Mac — utile en transition avant standardisation `fleet`).
+    # résout le user par Mac — utile en transition avant standardisation `cluster`).
     target="${host}"
     [ -n "$SSH_USER" ] && target="${SSH_USER}@${host}"
 
@@ -106,7 +106,7 @@ done
 
 echo -e "\n${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 if [ "$has_error" -eq 0 ]; then
-    echo -e "${GREEN}Déploiement terminé sur toute la flotte.${NC}"
+    echo -e "${GREEN}Déploiement terminé sur tout le cluster.${NC}"
 else
     echo -e "${YELLOW}Déploiement terminé avec des erreurs sur certains hôtes.${NC}"
 fi

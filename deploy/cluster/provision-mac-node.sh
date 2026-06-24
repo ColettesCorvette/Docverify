@@ -1,10 +1,10 @@
 #!/bin/bash
-# Provisionne un Mac en unite docverify autonome pour la flotte phase 2.
+# Provisionne un Mac en unite docverify autonome pour le cluster phase 2.
 #
 # Topologie shared-nothing : chaque Mac est independant.
 #   k3d (docverify, 2 replicas)  ->  DMR Metal local via 192.168.65.254:12434
-# Aucun appel LLM ne traverse le LAN. Le LB de flotte ne fait que repartir
-# le trafic HTTP entrant sur les :8680 des Macs. Voir deploy/fleet/README.md.
+# Aucun appel LLM ne traverse le LAN. Le LB de cluster ne fait que repartir
+# le trafic HTTP entrant sur les :8680 des Macs. Voir deploy/cluster/README.md.
 #
 # A lancer depuis la racine du repo sur CHAQUE Mac, une fois Docker Desktop
 # installe et lance.
@@ -97,7 +97,7 @@ step "7. Verification de bout en bout"
 ip=$(ipconfig getifaddr en0 || echo 127.0.0.1)
 if curl -fsS "http://localhost:8680/health" >/dev/null; then
 	echo "Noeud pret. docverify joignable sur http://$ip:8680"
-	echo "Ajoute cette IP au LB de flotte : deploy/fleet/Caddyfile"
+	echo "Ajoute cette IP au LB de cluster : deploy/cluster/Caddyfile"
 else
 	echo "/health KO, verifier : kubectl get pods"
 	exit 1

@@ -53,7 +53,7 @@ type Queue struct {
 }
 
 // QueueStats est un instantané de l'état de la queue, exposé par /health pour
-// le monitoring de la flotte.
+// le monitoring du cluster.
 type QueueStats struct {
 	Workers  int `json:"workers"`  // taille du pool de workers
 	Queued   int `json:"queued"`   // jobs en attente dans le buffer

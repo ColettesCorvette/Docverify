@@ -1,13 +1,13 @@
-# LB de flotte docverify, shared-nothing. Fichier STATIQUE, source de vérité,
+# LB de cluster docverify, shared-nothing. Fichier STATIQUE, source de vérité,
 # édité à la main. Une ligne `to <IP>:8680` par Mac (IP DHCP-réservées).
 # Un Mac down ou au DMR hangé sort tout seul de la rotation via le
 # health-check actif /health. Ajout/retrait d'un Mac : éditer ce fichier
-# puis `caddy reload --config deploy/fleet/Caddyfile`.
+# puis `caddy reload --config deploy/cluster/Caddyfile`.
 #
 # Lancer sur le Mac principal ou un hote front :
 #   docker run -d --name docverify-lb -p 8080:8080 \
-#     -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
-# ou en local : caddy run --config deploy/fleet/Caddyfile
+#     -v "$PWD/deploy/cluster/Caddyfile:/etc/caddy/Caddyfile" caddy:2
+# ou en local : caddy run --config deploy/cluster/Caddyfile
 {
 	# Admin sur loopback uniquement : permet `caddy reload`/`caddy stop`
 	# (rechargement à chaud lors d'un ajout/retrait de Mac) sans exposer
@@ -17,8 +17,11 @@
 
 :8080 {
 	reverse_proxy {
-		# Une ligne par Mac de la flotte (IP DHCP-réservées). Ajout/retrait :
+		# Une ligne par Mac du cluster (IP DHCP-réservées). Ajout/retrait :
 		# éditer ces lignes puis `caddy reload`.
+		# Le Mac principal (48 Go) sert aussi de worker : le LB tourne sur lui,
+		# il route vers son docverify local en loopback.
+		to 127.0.0.1:8680
 		to 10.40.1.10:8680
 		to 10.40.1.11:8680
 		to 10.40.1.12:8680

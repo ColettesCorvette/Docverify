@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Provisionne (ou re-provisionne) le k3d d'un Mac de la flotte pour pull docverify
+# Provisionne (ou re-provisionne) le k3d d'un Mac du cluster pour pull docverify
 # depuis le registre interne rhea. Idempotent : supprime le cluster existant et
 # le recrée propre avec la config registre.
 # Config durable du nœud attendue dans ~/.config/docverify/ : rhea-ca.crt,

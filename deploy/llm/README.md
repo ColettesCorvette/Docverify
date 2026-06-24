@@ -16,7 +16,7 @@ docverify n'est pas modifié : il parle OpenAI au Service `vllm`, soit
 | Intel Arc / XPU | `Dockerfile.xpu` | `intel/vllm` | `gpu.intel.com/i915` |
 | CPU | `Dockerfile.cpu` | build sources vLLM | cpu / memory |
 
-**macOS n'est pas ici.** La flotte Mac sert le LLM via Docker Model Runner
+**macOS n'est pas ici.** Le cluster Mac sert le LLM via Docker Model Runner
 host-native (Metal, llama.cpp GGUF) dans le cluster K8s multi-Mac. vLLM sur Metal
 ne gère pas la vision, donc aucune image macOS n'a de sens pour notre VLM.
 

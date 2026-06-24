@@ -40,6 +40,10 @@ desktop/
 # Notes brutes
 tmp.txt
 
+# Logs
+log/
+*.log
+
 # Inputs de test                                                                       
 input*.json
 batch1.json                                                                                                           

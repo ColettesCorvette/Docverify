@@ -1,4 +1,4 @@
-# Flotte docverify, phase 2 shared-nothing
+# Cluster docverify, phase 2 shared-nothing
 
 Architecture de mise a l'echelle sur plusieurs Macs, actee apres le bench DMR
 CPU vs Metal du 2026-06-05 : un pod DMR conteneurise tombe en CPU et depasse le
@@ -12,7 +12,7 @@ Chaque Mac est une unite autonome et identique :
                           ┌─ Mac principal ─────────────────────┐
                           │ k3d : docverify x2  ─┐                │
                           │                     └─► DMR Metal     │
-Regia ─► LB de flotte ─────┤                        127.0.0.1:12434│
+Regia ─► LB de cluster ─────┤                        127.0.0.1:12434│
         (Caddy :8080)     │ ... idem ...                          │
                           ├─ Mac worker #1 ──────────────────────┤
                           ├─ Mac worker #2 ──────────────────────┤
@@ -22,7 +22,7 @@ Regia ─► LB de flotte ─────┤                        127.0.0.1:12
 - Aucun appel LLM ne traverse le LAN : chaque docverify parle a son DMR local
   via la passerelle hôte `192.168.65.254:12434`. DMR reste sur `127.0.0.1`, pas d'exposition.
 - Le LB ne repartit que le trafic HTTP entrant sur les `:8680` publies par k3d.
-- **Mise à l'échelle** : le `Caddyfile` statique liste la flotte (une ligne `to <IP>:8680` par Mac, IP DHCP-réservées). Ajout/retrait d'un nœud : éditer le `Caddyfile` + `caddy reload`.
+- **Mise à l'échelle** : le `Caddyfile` statique liste le cluster (une ligne `to <IP>:8680` par Mac, IP DHCP-réservées). Ajout/retrait d'un nœud : éditer le `Caddyfile` + `caddy reload`.
 - Tolérance de panne : le health-check actif `/health` éjecte un Mac dont docverify ou
   le DMR local est tombé (aucune action manuelle requise).
 
@@ -31,7 +31,7 @@ Regia ─► LB de flotte ─────┤                        127.0.0.1:12
 Sur chaque Mac, depuis la racine du repo :
 
 ```bash
-./deploy/fleet/provision-mac-node.sh
+./deploy/cluster/provision-mac-node.sh
 ```
 
 Le script installe k3d si absent dans ~/.local/bin sans sudo, gate l'activation
@@ -87,24 +87,24 @@ complet l'a republie correctement. Si kubectl devient injoignable hors reboot,
 
 ## Lancer le Load Balancer Caddy
 
-Le `Caddyfile` est **statique** : une ligne `to <IP>:8680` par Mac de la flotte
+Le `Caddyfile` est **statique** : une ligne `to <IP>:8680` par Mac du cluster
 (IP DHCP-réservées). Aucun registre, aucune génération automatique.
 
-1. **Éditer `deploy/fleet/Caddyfile`** : ajouter/retirer une ligne `to <IP>:8680`
+1. **Éditer `deploy/cluster/Caddyfile`** : ajouter/retirer une ligne `to <IP>:8680`
    par nœud.
 
 2. **Lancer Caddy** sur le nœud front (`:8080`) :
 
-       caddy run --config deploy/fleet/Caddyfile
+       caddy run --config deploy/cluster/Caddyfile
 
    ou en conteneur :
 
        docker run -d --name docverify-lb -p 8080:8080 \
-         -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
+         -v "$PWD/deploy/cluster/Caddyfile:/etc/caddy/Caddyfile" caddy:2
 
 3. **Recharger à chaud** après édition :
 
-       caddy reload --config deploy/fleet/Caddyfile
+       caddy reload --config deploy/cluster/Caddyfile
 
 Un Mac down ou au DMR hangé est éjecté automatiquement de la rotation par le
 health-check actif `/health` (aucune action manuelle requise).
