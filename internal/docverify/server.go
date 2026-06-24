@@ -18,6 +18,13 @@ import (
 // client a fermé sa connexion avant la fin du traitement (convention nginx).
 const statusClientClosed = 499
 
+// Version du binaire, surchargeable au build via
+// -ldflags "-X github.com/.../docverify.Version=...". Défaut en dev.
+var Version = "dev"
+
+// startTime sert à calculer l'uptime exposé par /health.
+var startTime = time.Now()
+
 // maxUploadBytes borne la taille acceptée d'un upload multipart. Au-delà,
 // http.MaxBytesReader court-circuite la requête sans charger l'intégralité
 // du body en mémoire.
@@ -68,7 +75,7 @@ func StartServer() {
 
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /health", handleHealth)
+	mux.HandleFunc("GET /health", makeHealthHandler(queue))
 	mux.HandleFunc("POST /api/v1/supporting-documents", makeSupportingDocumentHandler(queue))
 
 	srv := &http.Server{
@@ -101,20 +108,37 @@ func StartServer() {
 
 // --- Health check ---------------------------------------------------------
 
-func handleHealth(w http.ResponseWriter, r *http.Request) {
-	status := map[string]string{"status": "ok"}
-	ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
-	defer cancel()
-	if err := PingLLM(ctx, DefaultLLMURL()); err != nil {
-		status["llm"] = "unreachable"
-		status["status"] = "degraded"
+// makeHealthHandler renvoie le handler de /health, enrichi des métriques de la
+// queue (workers, profondeur, in-flight) et d'infos de build, pour alimenter le
+// dashboard de monitoring de la flotte. Le code HTTP reste 200 (ok) / 503
+// (degraded, LLM injoignable) — la readinessProbe k8s s'en sert.
+func makeHealthHandler(q *Queue) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		st := q.Stats()
+		body := map[string]any{
+			"status":   "ok",
+			"version":  Version,
+			"uptime_s": int(time.Since(startTime).Seconds()),
+			"workers":  st.Workers,
+			"queued":   st.Queued,
+			"capacity": st.Capacity,
+			"inflight": st.InFlight,
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)
+		defer cancel()
+
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusServiceUnavailable)
-		json.NewEncoder(w).Encode(status)
-		return
+		if err := PingLLM(ctx, DefaultLLMURL()); err != nil {
+			body["status"] = "degraded"
+			body["llm"] = "unreachable"
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(body)
+			return
+		}
+		body["llm"] = "ok"
+		json.NewEncoder(w).Encode(body)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(status)
 }
 
 // writeJSONError renvoie une erreur au format JSON.
