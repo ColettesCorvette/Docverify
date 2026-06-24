@@ -9,19 +9,19 @@
 #     -v "$PWD/deploy/fleet/Caddyfile:/etc/caddy/Caddyfile" caddy:2
 # ou en local : caddy run --config deploy/fleet/Caddyfile
 {
-	admin off
+	# Admin sur loopback uniquement : permet `caddy reload`/`caddy stop`
+	# (rechargement à chaud lors d'un ajout/retrait de Mac) sans exposer
+	# de surface réseau. NE PAS binder sur 0.0.0.0.
+	admin localhost:2019
 }
 
 :8080 {
 	reverse_proxy {
-		# Une ligne par Mac de la flotte, a renseigner selon l'environnement.
-		# Les IP ne sont pas stables tant que les Macs ne sont pas en place :
-		# prevoir une reservation DHCP par Mac, ou des noms .local si le reseau
-		# resout le Bonjour, plutot que des IP en dur sujettes a changer.
-		to 192.168.30.42:8680
-		# to 192.168.30.xxx:8680
-		# to 192.168.30.xxx:8680
-		# to 192.168.30.xxx:8680
+		# Une ligne par Mac de la flotte (IP DHCP-réservées). Ajout/retrait :
+		# éditer ces lignes puis `caddy reload`.
+		to 10.40.1.10:8680
+		to 10.40.1.11:8680
+		to 10.40.1.12:8680
 
 		lb_policy least_conn
 
