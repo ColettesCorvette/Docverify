@@ -4,31 +4,31 @@
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-k3d-326CE5?logo=kubernetes&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Model%20Runner-2496ED?logo=docker&logoColor=white)
 
-`docverify` est un service Go qui décide si un justificatif administratif est valide : factures, cartes d'identité, passeports, justificatifs de domicile. Il combine de l'OCR et un LLM multimodal, tourne sur Kubernetes, et il est appelé par le back-office Regia, qui lui transmet un document accompagné de l'identité et de l'adresse attendues.
+`docverify` est un service Go qui décide si un justificatif administratif est valide : factures, cartes d'identité, passeports, justificatifs de domicile. Il combine OCR et LLM multimodal, tourne sur Kubernetes, et il est appelé par le back-office Regia qui lui transmet un document avec l'identité et l'adresse attendues.
 
-La documentation détaillée vit dans le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home). Ce README donne la vue d'ensemble et le strict nécessaire pour développer en local.
+Doc détaillée dans le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home). Ce README donne la vue d'ensemble et le nécessaire pour développer en local.
 
 ## Comment ça marche
 
-Regia envoie le document en POST sur l'API. Le serveur le dépose dans une queue interne, un pool de workers le traite, puis le fichier temporaire est supprimé et le verdict est renvoyé. La queue vit dans le processus de chaque pod : un simple channel Go alimenté par les requêtes et consommé par les workers. Elle borne ainsi le nombre d'appels simultanés au LLM sans dépendre d'un Redis.
+Regia POSTe le document sur l'API. Le serveur le dépose dans une queue Go interne au pod, un pool de workers le traite, le fichier temporaire est supprimé, le verdict renvoyé. La queue borne le nombre d'appels LLM simultanés sans dépendre d'un Redis.
 
-Le traitement suit une cascade qui s'arrête dès qu'elle a de quoi décider. Si le document porte un cachet 2D-DOC, le Datamatrix signé des justificatifs de domicile français, docverify le lit directement et court-circuite tout le reste : l'identité, l'adresse et la date sortent des données signées, sans OCR ni LLM. Sa signature cryptographique est en plus vérifiée contre la liste des certificats des autorités ANTS embarquée dans le binaire, ce qui authentifie le cachet. Sinon le texte est extrait par `pdftotext` pour un PDF natif, ou par Tesseract pour une image à fond simple. Quand cette extraction est trop pauvre, ou que le fond est complexe comme sur un passeport, docverify bascule sur le LLM multimodal. En dernier recours, si la page semble contenir plusieurs documents, par exemple un recto et un verso de carte d'identité scannés ensemble, elle est découpée en zones traitées séparément. À chaque étape, un nouveau résultat n'est conservé que s'il extrait plus d'informations que le précédent.
+Le traitement est une cascade qui s'arrête dès qu'elle peut décider. Un cachet 2D-DOC, le Datamatrix signé des justificatifs FR, court-circuite tout : identité, adresse et date sortent des données signées, sans OCR ni LLM, et la signature est vérifiée contre les certificats ANTS embarqués dans le binaire. Sinon le texte est extrait par `pdftotext` pour un PDF natif, ou Tesseract pour une image à fond simple. Extraction trop pauvre ou fond complexe, docverify bascule sur le LLM multimodal. En dernier recours la page est découpée en zones traitées séparément. À chaque étape un résultat n'est gardé que s'il extrait plus que le précédent.
 
-Le verdict porte un niveau de confiance à quatre paliers, de `nul` à `haut`, qui reflète le chemin ayant produit le résultat : un 2D-DOC à signature vérifiée ou un OCR net donnent `haut`, le LLM plafonne à `moyen`, une rescousse par segmentation reste `bas`, un document illisible est `nul`. Regia s'en sert pour décider de l'automatisation : `haut` passe seul, `moyen` ou `bas` demandent une confirmation manuelle, `nul` est rejeté.
+Le verdict porte un niveau de confiance à quatre paliers, de `nul` à `haut`, selon le chemin : 2D-DOC vérifié ou OCR net donnent `haut`, le LLM plafonne à `moyen`, la segmentation reste `bas`, illisible vaut `nul`. Regia automatise sur `haut`, demande confirmation sur `moyen`/`bas`, rejette `nul`.
 
-Le LLM est servi par Docker Model Runner, qui exécute le modèle vision `Gemma 4 E4B` au format GGUF sur le GPU Metal du Mac, en process hôte. Les pods l'atteignent par son endpoint OpenAI-compatible via la passerelle hôte fixe `192.168.65.254:12434` (ce qui évite les pannes DNS au redémarrage des clusters k3d). Côté code, docverify ne connaît qu'une URL OpenAI-compatible et un nom de modèle : on peut donc remplacer le backend sans toucher au service.
+Le LLM est servi par Docker Model Runner : modèle vision `Gemma 4 E4B` GGUF sur GPU Metal, en process hôte. Les pods l'atteignent via la passerelle hôte fixe `192.168.65.254:12434`, ce qui évite les pannes DNS au redémarrage de k3d. Le code ne connaît qu'une URL OpenAI-compatible et un nom de modèle : le backend se remplace sans toucher au service.
 
 ## Architecture
 
-### Développement Local (k3d mono-nœud)
-Le schéma ci-dessous illustre le fonctionnement sur une machine de développement unique. Les pods `docverify` s'exécutent dans un cluster local `k3d` et atteignent le **Docker Model Runner (DMR)** s'exécutant sur l'hôte pour utiliser le GPU Metal du Mac :
+### Développement local, k3d mono-nœud
+Les pods `docverify` tournent dans un cluster `k3d` local et atteignent le **Docker Model Runner** sur l'hôte pour le GPU Metal :
 
 <img src="assets/pipeline_cascade.svg" width="650" alt="Architecture locale" />
 
-Une requête suit le chemin : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner (hôte)** &rarr; **Gemma 4 E4B (GGUF)**.
+Chemin d'une requête : **Regia** &rarr; **pod docverify** &rarr; **Docker Model Runner hôte** &rarr; **Gemma 4 E4B**.
 
-### Production / Cluster Multi-nœuds (Shared-Nothing)
-En production, le cluster regroupe plusieurs Mac Minis physiques autonomes (topologie *Shared-Nothing*) — Mac principal inclus, qui sert aussi de worker. Chaque machine fait tourner son propre cluster `k3d` local (pods `docverify`) et son instance de **Docker Model Runner (DMR)** pour l'inférence locale (Metal GPU). L'image docverify est buildée une fois et poussée sur un **registre interne** (`alpha.srv.orbinea:5000`) ; chaque k3d la **pull** (`imagePullPolicy: Always`). Les requêtes sont réparties par un Load Balancer **Caddy** à configuration **statique** (`Caddyfile` versionné, une ligne `to <IP>:8680` par Mac). Un nœud HS est retiré tout seul de la rotation par le **health-check actif** `/health` :
+### Production, cluster multi-nœuds Shared-Nothing
+Le cluster regroupe plusieurs Mac Minis autonomes, Mac principal inclus qui sert aussi de worker. Chaque Mac a son cluster `k3d` local et son DMR. L'image docverify est buildée une fois et poussée sur le **registre interne** `alpha.srv.orbinea:5000` ; chaque k3d la pull. Un Load Balancer **Caddy** statique, une ligne `to <IP>:8680` par Mac, répartit les requêtes ; un nœud HS sort tout seul de la rotation via le **health-check** `/health` :
 
 <img src="assets/infrastructure_production.svg" width="650" alt="Infrastructure du cluster" />
 
@@ -36,20 +36,20 @@ En production, le cluster regroupe plusieurs Mac Minis physiques autonomes (topo
 
 | Projet | Rôle |
 |---|---|
-| [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un modèle GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
-| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage servi par défaut, empaqueté `hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M` |
+| [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
+| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage par défaut, `hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M` |
 | [k3d](https://k3d.io) | k3s en conteneurs Docker pour le cluster local |
 
 ## Développer et tester en local
 
-docverify est un projet Go pur, sans dépendance Go externe. Il a en revanche besoin de quelques outils système et d'un endpoint LLM joignable.
+Projet Go pur, sans dépendance Go externe. Besoin d'outils système et d'un endpoint LLM joignable.
 
 ```bash
 brew install go tesseract tesseract-lang poppler imagemagick dmtx-utils jq
 go build -o docverify ./cmd/docverify
 ```
 
-Le même binaire a trois modes. Sans argument, il démarre le serveur HTTP sur `:8680`, et l'URL du LLM se règle par la variable `LLM_URL`. Avec un fichier ou du JSON en argument, il analyse un document unique et l'affiche en tableau. Si l'entrée contient une liste `individuals`, il bascule en mode batch sur plusieurs personnes.
+Le binaire a trois modes. Sans argument il démarre le serveur HTTP sur `:8680`, l'URL du LLM se règle par `LLM_URL`. Avec un fichier ou du JSON il analyse un document unique. Si l'entrée contient une liste `individuals`, il passe en mode batch.
 
 ```bash
 LLM_URL=http://localhost:12434/engines ./docverify     # serveur HTTP
@@ -57,51 +57,47 @@ LLM_URL=http://localhost:12434/engines ./docverify     # serveur HTTP
 ./scripts/test-api.sh all                    # suite de tests sur les samples
 ```
 
-La route, ses champs et le mode webhook sont décrits dans le wiki, page [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP).
+Route, champs et mode webhook sur la page wiki [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP).
 
 ## Déployer
 
-Le backend LLM est Docker Model Runner, activé dans Docker Desktop avec le support TCP host-side. On récupère le modèle une fois par Mac, puis deux chemins de déploiement selon la cible.
+Backend LLM = Docker Model Runner, activé dans Docker Desktop avec le TCP host-side. On pull le modèle une fois par Mac, puis deux chemins selon la cible.
 
 ```bash
 docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une fois par Mac
 
-./scripts/redeploy.sh         # DEV LOCAL : build + import k3d + override local (sans registre)
+./scripts/redeploy.sh         # DEV LOCAL : build + import k3d + override local, sans registre
 ./scripts/deploy-cluster.sh   # CLUSTER : build + push registre, puis rollout de chaque nœud
 ```
 
-Le manifeste `deploy/k8s/docverify-deployment.yaml` cible l'image du registre interne (`imagePullPolicy: Always`). Un Mac neuf se provisionne avec `deploy/cluster/provision-node-registry.sh` (config registre + cluster k3d + `kubectl apply`), puis on l'ajoute au `Caddyfile`. Les pods atteignent le runner via la passerelle hôte `192.168.65.254:12434`. Pour servir le LLM depuis une machine Linux à GPU plutôt que depuis le runner hôte, `deploy/llm/` fournit des images vLLM préparées par accélérateur, CUDA, ROCm, Intel Arc ou CPU, avec leur script de build et un manifeste de déploiement. Voir `deploy/llm/README.md`.
+Le manifeste `deploy/k8s/docverify-deployment.yaml` cible l'image du registre interne en `imagePullPolicy: Always`. Un Mac neuf se provisionne avec `deploy/cluster/provision-node-registry.sh`, puis on l'ajoute au `Caddyfile`. Pour servir le LLM depuis une machine Linux à GPU, `deploy/llm/` fournit des images vLLM par accélérateur. Voir `deploy/llm/README.md`.
 
 ## Documentation
 
 | Page | Contenu |
 |---|---|
-| [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP) | Route, champs multipart, réponses, mode webhook, codes d'erreur |
-| [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) | Détail de l'outillage et de la configuration par `.env` |
-| [Commandes utiles](https://git.int.orbinea.example/tfuchs/docverify/wiki/Commandes-utiles) | Logs, shell dans un pod, scale, gestion du backend LLM |
+| [API HTTP](https://git.int.orbinea.example/tfuchs/docverify/wiki/API-HTTP) | Route, champs multipart, réponses, webhook, codes d'erreur |
+| [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) | Outillage et configuration par `.env` |
+| [Commandes utiles](https://git.int.orbinea.example/tfuchs/docverify/wiki/Commandes-utiles) | Logs, shell dans un pod, scale, backend LLM |
 | [Dashboard](https://git.int.orbinea.example/tfuchs/docverify/wiki/Dashboard) | Dashboard Kubernetes, installation et accès |
 
 ## Scripts
 
-Le dossier `scripts/` regroupe l'outillage de développement et d'exploitation. Les paramètres communs comme l'URL de l'API, le modèle, le chemin des samples ou le cluster se centralisent dans un `.env` à la racine : copie `.env.example` en `.env` et ajuste. Chaque script charge ce `.env` s'il existe, sinon il retombe sur ses défauts.
+Le dossier `scripts/` regroupe l'outillage de dev et d'exploitation. Les paramètres communs se centralisent dans un `.env` racine : copie `.env.example` en `.env` et ajuste.
 
 | Script | Rôle |
 |---|---|
-| `test-api.sh` | Suite de tests HTTP contre les samples, un cas ou tous |
-| `concurrency-test.sh` | Rafale parallèle, garde anti-régression de la contamination |
-| `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring contre le groundtruth |
-| `redeploy.sh` | Dev local : build + import k3d + override local du Deployment (image locale, sans toucher au registre) |
-| `deploy-cluster.sh` | Déploie le cluster : build + push de l'image sur le registre interne, puis `rollout restart` de chaque nœud via SSH (k3d pull) |
-| `monitor-cluster.sh` | Dashboard temps réel de la santé du cluster (`/health` enrichi : status, LLM, workers, queue, in-flight, version) |
-| `provision-node-registry.sh` | Provisionne le k3d d'un Mac pour pull depuis le registre (recrée le cluster avec la config registre rhea) |
+| `test-api.sh` | Tests HTTP contre les samples, un cas ou tous |
+| `concurrency-test.sh` | Rafale parallèle, garde anti-contamination |
+| `bench-models.sh` + `score-bench.sh` | Bench multi-modèles et scoring |
+| `redeploy.sh` | Dev local : build + import k3d + override local, sans registre |
+| `deploy-cluster.sh` | Cluster : build + push registre, rollout de chaque nœud via SSH |
+| `monitor-cluster.sh` | Dashboard temps réel du cluster, `/health` enrichi |
+| `provision-node-registry.sh` | Provisionne le k3d d'un Mac pour pull du registre |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
-
-Pour servir le LLM hors macOS, les images vLLM par accélérateur vivent dans `deploy/llm/` avec leur `build.sh`.
-
-Le détail de chaque script et de sa configuration est sur la page [Scripts](https://git.int.orbinea.example/tfuchs/docverify/wiki/Scripts) du wiki.
 
 ## Machines
 
-Le cluster est composé de quatre Mac Mini M4 Pro 12 cœurs en shared-nothing (un nœud k3d autonome + DMR local par machine). Le Mac principal (48 Go de mémoire unifiée) sert à la fois de poste de développement, de front Load Balancer **et** de worker. Trois Mac Mini supplémentaires (24 Go chacun) complètent le cluster.
+Quatre Mac Mini M4 Pro 12 cœurs en shared-nothing, un nœud k3d autonome et un DMR local par machine. Le principal, 48 Go, sert de poste de dev, de front Load Balancer et de worker. Trois Mac de 24 Go complètent le cluster.
 
-Pour s'adapter aux Mac workers de 24 Go de RAM, le modèle vision-langage de production est quantisé en `Q4_K_M` (4.62 GiB), ce qui libère 3 Go de VRAM par nœud tout en conservant une justesse de 100% au benchmark. Le système supporte les rafales de charge intense (ex: 12 requêtes simultanées) sans crash ni timeout grâce au découplage du cycle de vie des tâches (timeout d'attente court en file et timeout d'exécution garanti pour le worker).
+Pour tenir dans 24 Go, le modèle de production est quantisé en `Q4_K_M`, 4.62 GiB, ce qui libère 3 Go de VRAM par nœud à 100% de justesse au benchmark. Le découplage du cycle de vie des tâches, timeout d'attente court en file et timeout d'exécution garanti pour le worker, encaisse les rafales intenses sans crash ni timeout.
