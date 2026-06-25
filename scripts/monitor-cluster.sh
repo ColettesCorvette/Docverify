@@ -47,6 +47,10 @@ fi
 sample_node() {
 	local node="$1" host port out meta body code ttime lat
 	host=${node%%:*}; port=${node##*:}
+	# host.docker.internal ne résout que dans un conteneur. Le monitor tourne sur
+	# l'hôte du principal : son docverify local est sur 127.0.0.1. On sonde là,
+	# en gardant le nom Caddyfile à l'affichage.
+	[ "$host" = "host.docker.internal" ] && host=127.0.0.1
 
 	out=$(curl -s -m 1 -w $'\n%{http_code} %{time_total}' "http://${host}:${port}/health" 2>/dev/null)
 	meta=$(printf '%s' "$out" | tail -1)
@@ -57,7 +61,7 @@ sample_node() {
 
 	if [ -z "$code" ] || [ "$code" = "000" ]; then
 		agg_down=$((agg_down + 1))
-		printf "${RED}%-18s${NC}  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${EOL}\n" \
+		printf "${RED}%-25s${NC}  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${EOL}\n" \
 			"$node" "DOWN" "-" ">1000ms" "-" "-" "-" "-"
 		return
 	fi
@@ -92,7 +96,7 @@ sample_node() {
 	elif [ "$up" -ge 60 ]; then uptime_h="$((up/60))m$((up%60))s"
 	else uptime_h="${up}s"; fi
 
-	printf "${scol}%-18s${NC}  ${scol}%-9s${NC}  ${llmcol}%-13s${NC}  %5sms  ${BOLD}%4s${NC}/%-4s  %4s/%-5s  %-8s %8s${EOL}\n" \
+	printf "${scol}%-25s${NC}  ${scol}%-9s${NC}  ${llmcol}%-13s${NC}  %5sms  ${BOLD}%4s${NC}/%-4s  %4s/%-5s  %-8s %8s${EOL}\n" \
 		"$node" "$status" "$llm" "$lat" "$inf" "$wk" "$q" "$cap" "$ver" "$uptime_h"
 }
 
@@ -115,7 +119,7 @@ render() {
 	printf '\033[H'  # home (pas de clear total → refresh en place, sans flicker)
 	echo -e "${BOLD}${BLUE}  DASHBOARD CLUSTER docverify${NC}   ${DIM}$(date '+%Y-%m-%d %H:%M:%S')   refresh ${INTERVAL}s   Ctrl-C pour quitter${NC}${EOL}"
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
-	printf "${BOLD}%-18s  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${NC}${EOL}\n" \
+	printf "${BOLD}%-25s  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${NC}${EOL}\n" \
 		"NŒUD" "STATUS" "LLM" "LATENCE" "INFLT/WK" "QUEUE/CAP" "VERSION" "UPTIME"
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
 
