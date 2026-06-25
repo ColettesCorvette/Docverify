@@ -19,9 +19,11 @@
 	reverse_proxy {
 		# Une ligne par Mac du cluster (IP DHCP-réservées). Ajout/retrait :
 		# éditer ces lignes puis `caddy reload`.
-		# Le Mac principal (48 Go) sert aussi de worker : le LB tourne sur lui,
-		# il route vers son docverify local en loopback.
-		to 127.0.0.1:8680
+		# Le Mac principal (48 Go) sert aussi de worker : le LB tourne sur lui.
+		# host.docker.internal et non 127.0.0.1 : le LB est un conteneur, son
+		# loopback n'est pas l'hôte. host.docker.internal résout l'hôte sous
+		# Docker Desktop, donc atteint le docverify du principal sur :8680.
+		to host.docker.internal:8680
 		to 10.40.1.10:8680
 		to 10.40.1.11:8680
 		to 10.40.1.12:8680
@@ -33,12 +35,15 @@
 		health_timeout 2s
 		health_status 200
 
-		# Couvre le jobTimeout de 90s du pipeline en mode synchrone.
+		# Doit survivre au pire cas du pipeline : queueTimeout 45s PUIS
+		# execTimeout 120s, soit ~165s avant le verdict. À 120s, Caddy
+		# coupait avant que docverify rende son `unreadable` 200 → 504 brut.
+		# 180s garantit que le client reçoit toujours le verdict gracieux.
 		transport http {
 			dial_timeout 5s
-			response_header_timeout 120s
-			read_timeout 120s
-			write_timeout 120s
+			response_header_timeout 180s
+			read_timeout 180s
+			write_timeout 180s
 		}
 	}
 }

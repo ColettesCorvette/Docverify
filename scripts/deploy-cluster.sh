@@ -91,8 +91,9 @@ for host in $hosts; do
         echo '=== rollout ==='; kubectl rollout restart deploy/'$DEPLOY'; \
         kubectl rollout status deploy/'$DEPLOY' --timeout=120s"
 
-    # Le principal (127.0.0.1) est cette machine : kubectl en local, pas de SSH.
-    if [ "$host" = "127.0.0.1" ] || [ "$host" = "localhost" ]; then
+    # Le principal est cette machine : kubectl en local, pas de SSH. Le Caddyfile
+    # le désigne par host.docker.internal (LB conteneurisé), à traiter comme local.
+    if [ "$host" = "127.0.0.1" ] || [ "$host" = "localhost" ] || [ "$host" = "host.docker.internal" ]; then
         run() { bash -c "$rollout_cmd"; }
     else
         target="${host}"
