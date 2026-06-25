@@ -20,10 +20,10 @@
 		# Une ligne par Mac du cluster (IP DHCP-réservées). Ajout/retrait :
 		# éditer ces lignes puis `caddy reload`.
 		# Le Mac principal (48 Go) sert aussi de worker : le LB tourne sur lui.
-		# host.docker.internal et non 127.0.0.1 : le LB est un conteneur, son
-		# loopback n'est pas l'hôte. host.docker.internal résout l'hôte sous
-		# Docker Desktop, donc atteint le docverify du principal sur :8680.
-		to host.docker.internal:8680
+		# Son IP WireGuard, comme les workers : stable (assignée par la conf wg,
+		# pas DHCP) et joignable du conteneur LB comme de l'hôte. Pas 127.0.0.1,
+		# qui pour un LB conteneurisé désigne le conteneur, pas l'hôte.
+		to 10.40.100.15:8680
 		to 10.40.1.10:8680
 		to 10.40.1.11:8680
 		to 10.40.1.12:8680

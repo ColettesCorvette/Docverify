@@ -58,6 +58,15 @@ if [ -z "$hosts" ]; then
     exit 0
 fi
 
+# IP locales de cette machine (le principal fait tourner le LB et est lui-même
+# un nœud du Caddyfile, par son IP WireGuard). Un hôte qui matche = rollout en
+# local, pas de SSH-vers-soi. Couvre WG, LAN, loopback.
+LOCAL_IPS=$(ifconfig 2>/dev/null | awk '/inet /{print $2}' | tr '\n' ' ')
+is_local() {
+    case " $LOCAL_IPS 127.0.0.1 localhost " in *" $1 "*) return 0 ;; esac
+    return 1
+}
+
 echo -e "${BOLD}${BLUE}Build + push de l'image (une fois) : $REGISTRY_IMAGE${NC}"
 docker build -f deploy/Dockerfile -t "$REGISTRY_IMAGE" .
 docker push "$REGISTRY_IMAGE"
@@ -91,9 +100,9 @@ for host in $hosts; do
         echo '=== rollout ==='; kubectl rollout restart deploy/'$DEPLOY'; \
         kubectl rollout status deploy/'$DEPLOY' --timeout=120s"
 
-    # Le principal est cette machine : kubectl en local, pas de SSH. Le Caddyfile
-    # le désigne par host.docker.internal (LB conteneurisé), à traiter comme local.
-    if [ "$host" = "127.0.0.1" ] || [ "$host" = "localhost" ] || [ "$host" = "host.docker.internal" ]; then
+    # Le principal est cette machine, désigné dans le Caddyfile par son IP WG :
+    # kubectl en local, pas de SSH-vers-soi.
+    if is_local "$host"; then
         run() { bash -c "$rollout_cmd"; }
     else
         target="${host}"
