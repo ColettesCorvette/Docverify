@@ -27,14 +27,16 @@ spec:
         #   value: "http://192.168.65.254:12434/engines"
         # - name: LLM_MODEL
         #   value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
-        # QUEUE_WORKERS borne le parallélisme par pod. Le total réel vaut
-        # replicas x QUEUE_WORKERS et doit rester proche de la capacité LLM
-        # cumulée, soit nb_de_Macs x 5 places de --max-num-seqs. Un seul Mac :
-        # garder 5. Pour N Macs, monter QUEUE_WORKERS ou replicas en conséquence.
+        # QUEUE_WORKERS borne le parallélisme par pod. Un GPU Metal ne traite
+        # qu'une inférence à la fois : 2+ inférences concurrentes le font
+        # thrasher. Bench 2026-06-25 sur facture image : 1 requête 9s, mais
+        # 3 simultanées à workers=3 = 137s chacune (~15x), contre 9/19/28s à
+        # workers=1 (sérialisé propre). Donc 1 worker par GPU. Pour plus de
+        # débit, ajouter des Macs, pas des workers sur le même GPU.
         - name: QUEUE_WORKERS
-          value: "3"
+          value: "1"
         - name: LLM_MAX_CONCURRENT
-          value: "3"
+          value: "1"
         livenessProbe:
           httpGet:
             path: /health
