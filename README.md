@@ -70,7 +70,7 @@ docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une 
 ./scripts/deploy-cluster.sh   # CLUSTER : build + push registre, puis rollout de chaque nœud
 ```
 
-Le manifeste `deploy/k8s/docverify-deployment.yaml` cible l'image du registre interne en `imagePullPolicy: Always`. Un Mac neuf se provisionne avec `deploy/cluster/provision-node-registry.sh`, puis on l'ajoute au `Caddyfile`. Pour servir le LLM depuis une machine Linux à GPU, `deploy/llm/` fournit des images vLLM par accélérateur. Voir `deploy/llm/README.md`.
+Le manifeste `deploy/k8s/docverify-deployment.yaml` cible l'image du registre interne en `imagePullPolicy: Always`. Un Mac neuf s'onboarde depuis le contrôle avec `deploy/cluster/bootstrap-node.sh <ip>`, qui pousse la config, installe les outils, provisionne le k3d et affiche la ligne à coller au `Caddyfile`. Pour servir le LLM depuis une machine Linux à GPU, `deploy/llm/` fournit des images vLLM par accélérateur. Voir `deploy/llm/README.md`.
 
 ## Documentation
 
@@ -93,7 +93,8 @@ Le dossier `scripts/` regroupe l'outillage de dev et d'exploitation. Les paramè
 | `redeploy.sh` | Dev local : build + import k3d + override local, sans registre |
 | `deploy-cluster.sh` | Cluster : build + push registre, rollout de chaque nœud via SSH |
 | `monitor-cluster.sh` | Dashboard temps réel du cluster, `/health` enrichi |
-| `provision-node-registry.sh` | Provisionne le k3d d'un Mac pour pull du registre |
+| `bootstrap-node.sh` | Onboarde un Mac neuf depuis le contrôle : config, outils, k3d |
+| `provision-node-registry.sh` | Cœur registre : recrée le k3d d'un Mac pour pull du registre |
 | `push-wiki.sh` | Pousse `wiki/` vers le wiki Gitea |
 
 ## Machines

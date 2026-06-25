@@ -82,21 +82,25 @@ for host in $hosts; do
     echo -e "${BOLD}Rollout sur : $host...${NC}"
     echo -e "${BOLD}${BLUE}─────────────────────────────────────────────────────────────────${NC}"
 
-    # Cible SSH : user explicite si SSH_USER posé, sinon host seul (~/.ssh/config
-    # résout le user par Mac — utile en transition avant standardisation `cluster`).
-    target="${host}"
-    [ -n "$SSH_USER" ] && target="${SSH_USER}@${host}"
-
-    # Commande distante : k3d re-pull l'image depuis le registre via le rollout.
-    # Le node ne fait NI git NI build NI réception d'image — il pull tout seul.
-    # brew shellenv : un shell SSH non-login n'a pas /opt/homebrew/bin dans le
-    # PATH, sans ça kubectl ressort en 'command not found'.
-    remote_cmd="set -e; \
-        eval \"\$(/opt/homebrew/bin/brew shellenv)\"; \
+    # k3d re-pull l'image du registre via le rollout. Le node ne fait NI git NI
+    # build NI réception d'image. PATH explicite : un shell SSH non-login n'a ni
+    # /usr/local/bin (kubectl Docker Desktop) ni ~/.local/bin (k3d), sans quoi
+    # kubectl ressort en 'command not found'.
+    rollout_cmd="set -e; \
+        export PATH=\"\$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin:\$PATH\"; \
         echo '=== rollout ==='; kubectl rollout restart deploy/'$DEPLOY'; \
         kubectl rollout status deploy/'$DEPLOY' --timeout=120s"
 
-    if ssh -o ConnectTimeout=5 -o BatchMode=no "$target" "$remote_cmd"; then
+    # Le principal (127.0.0.1) est cette machine : kubectl en local, pas de SSH.
+    if [ "$host" = "127.0.0.1" ] || [ "$host" = "localhost" ]; then
+        run() { bash -c "$rollout_cmd"; }
+    else
+        target="${host}"
+        [ -n "$SSH_USER" ] && target="${SSH_USER}@${host}"
+        run() { ssh -o ConnectTimeout=5 -o BatchMode=no "$target" "$rollout_cmd"; }
+    fi
+
+    if run; then
         echo -e "\n${GREEN} Rollout réussi sur $host !${NC}"
     else
         echo -e "\n${RED} ÉCHEC du rollout sur $host !${NC}"

@@ -24,18 +24,21 @@ Regia ─► LB de cluster ─────┤                        127.0.0.1:1
 
 ## Mettre en service un Mac
 
-L'image docverify vit sur le registre interne `alpha.srv.orbinea:5000`. Provisionner un Mac recrée son k3d avec la config registre puis applique le manifeste :
+L'image docverify vit sur le registre interne `alpha.srv.orbinea:5000`. Un Mac neuf s'onboarde depuis le Mac de contrôle :
 
 ```bash
-./deploy/cluster/provision-node-registry.sh
+./deploy/cluster/bootstrap-node.sh <ip-du-noeud>
 ```
+
+Le script pousse la config registre dans `~/.config/docverify` du nœud, installe k3d plus kubectl, précharge le modèle DMR, puis lance `provision-node-registry.sh` qui recrée le k3d avec la config registre et applique le manifeste. Il finit en affichant la ligne `to <ip>:8680` à coller au `Caddyfile`. Compte macOS commun `cluster` sur tout le cluster, l'user qui fait tourner Docker Desktop donc l'user SSH.
 
 Outils requis : Docker Desktop, qui fournit docker et kubectl, plus k3d. Go n'est pas requis, le binaire est compilé dans l'image et tiré du registre.
 
-Prérequis manuels, une fois par Mac :
+Prérequis manuels non scriptables, une fois par Mac, avant `bootstrap-node.sh` :
 
-1. Docker Desktop, Settings > General : cocher "Start Docker Desktop when you sign in". DMR démarre avec Docker Desktop, le modèle se charge à la première requête.
-2. Auto-login de session, Réglages > Utilisateurs et groupes. Indispensable sur un Mac sans clavier : sans auto-login, un reboot reste sur l'écran de connexion, DMR et k3d éteints. Si FileVault est actif, l'auto-login est inopérant, le disque chiffré exige le mot de passe au boot.
+1. Compte macOS primaire nommé `cluster`, auto-login activé. Sans auto-login un Mac sans clavier reste sur l'écran de connexion au reboot, DMR et k3d éteints. FileVault rend l'auto-login inopérant, le disque chiffré exige le mot de passe au boot.
+2. Docker Desktop, Settings > General : cocher "Start Docker Desktop when you sign in". DMR démarre avec Docker Desktop, le modèle se charge à la première requête.
+3. Partage > Connexion à distance ON, pour la clé SSH du contrôle. IP réservée en DHCP côté routeur.
 
 ## Survie au reboot
 
