@@ -116,13 +116,14 @@ func makeHealthHandler(q *Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		st := q.Stats()
 		body := map[string]any{
-			"status":   "ok",
-			"version":  Version,
-			"uptime_s": int(time.Since(startTime).Seconds()),
-			"workers":  st.Workers,
-			"queued":   st.Queued,
-			"capacity": st.Capacity,
-			"inflight": st.InFlight,
+			"status":    "ok",
+			"version":   Version,
+			"uptime_s":  int(time.Since(startTime).Seconds()),
+			"workers":   st.Workers,
+			"queued":    st.Queued,
+			"capacity":  st.Capacity,
+			"inflight":  st.InFlight,
+			"processed": st.Processed,
 		}
 
 		ctx, cancel := context.WithTimeout(r.Context(), 1500*time.Millisecond)

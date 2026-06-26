@@ -57,13 +57,13 @@ sample_node() {
 
 	if [ -z "$code" ] || [ "$code" = "000" ]; then
 		agg_down=$((agg_down + 1))
-		printf "${RED}%-18s${NC}  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${EOL}\n" \
-			"$node" "DOWN" "-" ">1000ms" "-" "-" "-" "-"
+		printf "${RED}%-18s${NC}  %-9s  %-13s  %7s  %-9s  %-10s  %7s  %-8s %8s${EOL}\n" \
+			"$node" "DOWN" "-" ">1000ms" "-" "-" "-" "-" "-"
 		return
 	fi
 
 	# Parse JSON enrichi (tolérant si un champ manque)
-	local status llm ver wk q inf cap up
+	local status llm ver wk q inf cap up proc
 	status=$(printf '%s' "$body" | jq -r '.status // "?"' 2>/dev/null)
 	llm=$(printf '%s'    "$body" | jq -r '.llm // "?"' 2>/dev/null)
 	ver=$(printf '%s'    "$body" | jq -r '.version // "?"' 2>/dev/null)
@@ -72,6 +72,7 @@ sample_node() {
 	inf=$(printf '%s'    "$body" | jq -r '.inflight // 0' 2>/dev/null)
 	cap=$(printf '%s'    "$body" | jq -r '.capacity // 0' 2>/dev/null)
 	up=$(printf '%s'     "$body" | jq -r '.uptime_s // 0' 2>/dev/null)
+	proc=$(printf '%s'   "$body" | jq -r '.processed // 0' 2>/dev/null)
 
 	local scol llmcol uptime_h
 	if [ "$status" = "ok" ]; then
@@ -86,14 +87,15 @@ sample_node() {
 	agg_inflight=$((agg_inflight + inf))
 	agg_queued=$((agg_queued + q))
 	agg_workers=$((agg_workers + wk))
+	agg_processed=$((agg_processed + proc))
 
 	# uptime lisible
 	if [ "$up" -ge 3600 ]; then uptime_h="$((up/3600))h$(((up%3600)/60))m"
 	elif [ "$up" -ge 60 ]; then uptime_h="$((up/60))m$((up%60))s"
 	else uptime_h="${up}s"; fi
 
-	printf "${scol}%-18s${NC}  ${scol}%-9s${NC}  ${llmcol}%-13s${NC}  %5sms  ${BOLD}%4s${NC}/%-4s  %4s/%-5s  %-8s %8s${EOL}\n" \
-		"$node" "$status" "$llm" "$lat" "$inf" "$wk" "$q" "$cap" "$ver" "$uptime_h"
+	printf "${scol}%-18s${NC}  ${scol}%-9s${NC}  ${llmcol}%-13s${NC}  %5sms  ${BOLD}%4s${NC}/%-4s  %4s/%-5s  ${BOLD}%7s${NC}  %-8s %8s${EOL}\n" \
+		"$node" "$status" "$llm" "$lat" "$inf" "$wk" "$q" "$cap" "$proc" "$ver" "$uptime_h"
 }
 
 # Distribution des requêtes en cours par backend, vue par le LB (best effort).
@@ -109,22 +111,22 @@ lb_distribution() {
 }
 
 render() {
-	agg_up=0; agg_degraded=0; agg_down=0; agg_inflight=0; agg_queued=0; agg_workers=0
+	agg_up=0; agg_degraded=0; agg_down=0; agg_inflight=0; agg_queued=0; agg_workers=0; agg_processed=0
 	local total; total=$(echo "$nodes" | wc -w | tr -d ' ')
 
 	printf '\033[H'  # home (pas de clear total → refresh en place, sans flicker)
 	echo -e "${BOLD}${BLUE}  DASHBOARD CLUSTER docverify${NC}   ${DIM}$(date '+%Y-%m-%d %H:%M:%S')   refresh ${INTERVAL}s   Ctrl-C pour quitter${NC}${EOL}"
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
-	printf "${BOLD}%-18s  %-9s  %-13s  %7s  %-9s  %-10s  %-8s %8s${NC}${EOL}\n" \
-		"NŒUD" "STATUS" "LLM" "LATENCE" "INFLT/WK" "QUEUE/CAP" "VERSION" "UPTIME"
+	printf "${BOLD}%-18s  %-9s  %-13s  %7s  %-9s  %-10s  %7s  %-8s %8s${NC}${EOL}\n" \
+		"NŒUD" "STATUS" "LLM" "LATENCE" "INFLT/WK" "QUEUE/CAP" "DOCS" "VERSION" "UPTIME"
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
 
 	local node
 	for node in $nodes; do sample_node "$node"; done
 
 	echo -e "${DIM}─────────────────────────────────────────────────────────────────────────────${NC}${EOL}"
-	printf "  ${GREEN}%d ok${NC}  ${YELLOW}%d degraded${NC}  ${RED}%d down${NC}   /  %d nœuds   |   in-flight total: ${BOLD}%d${NC}   queue: %d   capacité workers: %d${EOL}\n" \
-		"$agg_up" "$agg_degraded" "$agg_down" "$total" "$agg_inflight" "$agg_queued" "$agg_workers"
+	printf "  ${GREEN}%d ok${NC}  ${YELLOW}%d degraded${NC}  ${RED}%d down${NC}   /  %d nœuds   |   in-flight total: ${BOLD}%d${NC}   queue: %d   capacité workers: %d   |   docs traités: ${BOLD}%d${NC}${EOL}\n" \
+		"$agg_up" "$agg_degraded" "$agg_down" "$total" "$agg_inflight" "$agg_queued" "$agg_workers" "$agg_processed"
 
 	lb_distribution
 	printf '\033[0J'  # efface tout résidu sous le dashboard (lignes LB en moins, etc.)

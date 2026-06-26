@@ -47,27 +47,30 @@ type queueItem struct {
 // Queue est un broker in-process : un channel bufferisé alimenté par le
 // handler HTTP et consommé par un pool de workers.
 type Queue struct {
-	jobs     chan queueItem
-	workers  int
-	inFlight int64 // jobs en cours de traitement (atomic), pour /health
+	jobs      chan queueItem
+	workers   int
+	inFlight  int64 // jobs en cours de traitement (atomic), pour /health
+	processed int64 // jobs terminés depuis le démarrage (atomic), compteur de docs traités
 }
 
 // QueueStats est un instantané de l'état de la queue, exposé par /health pour
 // le monitoring du cluster.
 type QueueStats struct {
-	Workers  int `json:"workers"`  // taille du pool de workers
-	Queued   int `json:"queued"`   // jobs en attente dans le buffer
-	Capacity int `json:"capacity"` // capacité du buffer (jobBufferSize)
-	InFlight int `json:"inflight"` // jobs actuellement traités par un worker
+	Workers   int   `json:"workers"`   // taille du pool de workers
+	Queued    int   `json:"queued"`    // jobs en attente dans le buffer
+	Capacity  int   `json:"capacity"`  // capacité du buffer (jobBufferSize)
+	InFlight  int   `json:"inflight"`  // jobs actuellement traités par un worker
+	Processed int64 `json:"processed"` // total de docs traités depuis le démarrage du nœud
 }
 
 // Stats renvoie un instantané non bloquant de l'état de la queue.
 func (q *Queue) Stats() QueueStats {
 	return QueueStats{
-		Workers:  q.workers,
-		Queued:   len(q.jobs),
-		Capacity: cap(q.jobs),
-		InFlight: int(atomic.LoadInt64(&q.inFlight)),
+		Workers:   q.workers,
+		Queued:    len(q.jobs),
+		Capacity:  cap(q.jobs),
+		InFlight:  int(atomic.LoadInt64(&q.inFlight)),
+		Processed: atomic.LoadInt64(&q.processed),
 	}
 }
 
@@ -144,13 +147,14 @@ func (q *Queue) runWorker(id int) {
 		close(item.startCh)
 
 		log.Printf("[worker %d] traitement %s", id, item.job.FilePath)
-		
+
 		// Contexte d'exécution avec un timeout frais de 120 secondes
 		atomic.AddInt64(&q.inFlight, 1)
 		execCtx, execCancel := context.WithTimeout(item.ctx, execTimeout)
 		res := runPipeline(execCtx, item.job)
 		execCancel()
 		atomic.AddInt64(&q.inFlight, -1)
+		atomic.AddInt64(&q.processed, 1)
 
 		if res.Err != nil && errors.Is(res.Err, context.DeadlineExceeded) {
 			res.Err = errTimeout
