@@ -37,7 +37,7 @@ Le cluster regroupe plusieurs Mac Minis autonomes, Mac principal inclus qui sert
 | Projet | Rôle |
 |---|---|
 | [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
-| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage par défaut, `hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M` |
+| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage par défaut, `hf.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M` |
 | [k3d](https://k3d.io) | k3s en conteneurs Docker pour le cluster local |
 
 ## Développer et tester en local
@@ -64,7 +64,7 @@ Route, champs et mode webhook sur la page wiki [API HTTP](https://git.int.orbine
 Backend LLM = Docker Model Runner, activé dans Docker Desktop avec le TCP host-side. On pull le modèle une fois par Mac, puis deux chemins selon la cible.
 
 ```bash
-docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M   # backend LLM, une fois par Mac
+docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M   # backend LLM, une fois par Mac
 
 ./scripts/redeploy.sh         # DEV LOCAL : build + import k3d + override local, sans registre
 ./scripts/deploy-cluster.sh   # CLUSTER : build + push registre, puis rollout de chaque nœud

@@ -26,7 +26,7 @@ spec:
         # - name: LLM_URL
         #   value: "http://192.168.65.254:12434/engines"
         # - name: LLM_MODEL
-        #   value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+        #   value: "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M"
         # QUEUE_WORKERS borne le parallélisme par pod. Un GPU Metal ne traite
         # qu'une inférence à la fois : 2+ inférences concurrentes le font
         # thrasher. Bench 2026-06-25 sur facture image : 1 requête 9s, mais

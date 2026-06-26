@@ -17,7 +17,7 @@ import (
 	"time"
 )
 
-const DefaultModel = "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q4_K_M"
+const DefaultModel = "huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M"
 
 // --- Format OpenAI-compatible, via /v1 (Docker Model Runner, vLLM, etc.) ---
 
