@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 )
@@ -17,6 +18,21 @@ import (
 // statusClientClosed est le code non-standard utilisé pour signaler qu'un
 // client a fermé sa connexion avant la fin du traitement (convention nginx).
 const statusClientClosed = 499
+
+// defaultValidMonths est la fenêtre de validité par défaut d'un justificatif de
+// domicile/facture quand la requête ne précise pas valid_months.
+const defaultValidMonths = 3
+
+// parseValidMonths lit le champ multipart valid_months. Valeur vide, non
+// numérique ou <= 0 retombe sur le défaut (le client Regia peut l'omettre, et
+// le cahier des charges initial figeait 3 mois ; c'est désormais réglable,
+// ex. 12 mois pour certains clients).
+func parseValidMonths(raw string) int {
+	if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+		return n
+	}
+	return defaultValidMonths
+}
 
 // Version du binaire, surchargeable au build via
 // -ldflags "-X github.com/.../docverify.Version=...". Défaut en dev.
@@ -216,7 +232,7 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 				Name:        r.FormValue("name"),
 				Surname:     r.FormValue("surname"),
 				PostalCodes: []string{r.FormValue("postal_code")},
-				ValidMonths: 3,
+				ValidMonths: parseValidMonths(r.FormValue("valid_months")),
 				Model:       model,
 				LLMURL:      llmURL,
 			},
