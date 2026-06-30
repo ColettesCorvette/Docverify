@@ -4,9 +4,12 @@
 # health-check actif /health. Ajout/retrait d'un Mac : éditer ce fichier
 # puis `caddy reload --config deploy/cluster/Caddyfile`.
 #
-# Lancer sur le Mac principal ou un hote front :
-#   docker run -d --name docverify-lb -p 8080:8080 \
+# Lancer sur le Mac principal ou un hote front. --restart unless-stopped :
+# sinon le conteneur ne remonte pas au reboot (Docker Desktop redémarre les
+# conteneurs persistants au login, mais pas ceux en restart=no).
+#   docker run -d --name docverify-lb --restart unless-stopped -p 8080:8080 \
 #     -v "$PWD/deploy/cluster/Caddyfile:/etc/caddy/Caddyfile" caddy:2
+# Conteneur déjà créé sans la policy : docker update --restart unless-stopped docverify-lb
 # ou en local : caddy run --config deploy/cluster/Caddyfile
 {
 	# Admin sur loopback uniquement : permet `caddy reload`/`caddy stop`

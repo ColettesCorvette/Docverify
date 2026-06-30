@@ -47,6 +47,8 @@ cat <<EOF
   3. FileVault désactivé. Sinon l'auto-login est inopérant au reboot.
   4. Partage > Connexion à distance ON, pour la clé SSH de ce poste.
   5. IP ${IP} réservée en DHCP côté routeur.
+  6. WireGuard : 'brew install wireguard-tools' + /opt/homebrew/etc/wireguard/wg0.conf
+     provisionné (clés du nœud). L'étape 5 le rend persistant au reboot.
 EOF
 echo ""
 read -p "Ces 5 points sont faits sur le nœud ? (o/N) " -n 1 -r; echo ""
@@ -112,6 +114,78 @@ echo "-- provisioning registre (provision-node-registry.sh)"
 chmod +x ~/.config/docverify/provision-node-registry.sh
 bash ~/.config/docverify/provision-node-registry.sh
 REMOTE
+
+echo -e "\n${BOLD}== 5. Autostart WireGuard au boot (launchd) ==${NC}"
+# wg0 est déjà up (on s'est connecté par son IP WG), mais wg-quick lancé à la
+# main ne survit pas au reboot. On installe un LaunchDaemon root. Piège connu :
+# launchd démarre avec un PATH minimal sans /opt/homebrew/bin → wg-quick (script
+# bash appelant wg/awk/bash) échoue silencieusement. D'où le PATH explicite.
+# Payload contenant des sudo : scp puis 'ssh -t' avec stdin = terminal, sinon
+# sudo n'a pas de TTY pour le mot de passe (le heredoc occuperait stdin).
+WG_TMP=$(mktemp)
+cat > "$WG_TMP" <<'REMOTE'
+set -euo pipefail
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+CONF=/opt/homebrew/etc/wireguard/wg0.conf
+if [ ! -f "$CONF" ]; then
+    echo "wg0.conf absent ($CONF). Provisionne d'abord les clés WireGuard, puis relance."
+    exit 0
+fi
+command -v wg-quick >/dev/null || brew install wireguard-tools
+
+# AMFI bloque les binaires Homebrew non signés lancés par launchd au boot
+# (« has no CMS blob »). Signature ad-hoc → AMFI les accepte. À refaire après
+# 'brew upgrade wireguard-tools/wireguard-go' (réinstalle des binaires non signés).
+for b in wg wireguard-go; do
+    p=$(readlink -f "/opt/homebrew/bin/$b" 2>/dev/null || python3 -c "import os;print(os.path.realpath('/opt/homebrew/bin/$b'))")
+    [ -x "$p" ] && sudo codesign --force --sign - "$p"
+done
+
+PLIST=/Library/LaunchDaemons/com.wireguard.wg0.plist
+sudo tee "$PLIST" >/dev/null <<'PLISTEOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.wireguard.wg0</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/opt/homebrew/bin/wg-quick</string>
+    <string>up</string>
+    <string>wg0</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>/opt/homebrew/bin:/opt/homebrew/sbin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>RunAtLoad</key><true/>
+  <!-- Endpoint en DNS + race de boot : wg-quick échoue tant que le réseau/DNS
+       n'est pas prêt. SuccessfulExit=false → launchd relance sur exit≠0 et
+       s'arrête au premier exit 0 (tunnel monté). -->
+  <key>KeepAlive</key>
+  <dict><key>SuccessfulExit</key><false/></dict>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>StandardErrorPath</key><string>/var/log/wg0.err.log</string>
+  <key>StandardOutPath</key><string>/var/log/wg0.out.log</string>
+</dict>
+</plist>
+PLISTEOF
+sudo chown root:wheel "$PLIST"
+sudo chmod 644 "$PLIST"
+
+# Recharge idempotente. wg0 tourne déjà → bootout l'iface avant rebootstrap pour
+# éviter le « already exists » de wg-quick up.
+sudo launchctl bootout system/com.wireguard.wg0 2>/dev/null || true
+sudo wg-quick down wg0 2>/dev/null || true
+sudo launchctl bootstrap system "$PLIST"
+sleep 2
+sudo launchctl print system/com.wireguard.wg0 | grep -E 'state|last exit'
+wg show wg0 | head -3
+REMOTE
+scp -q "$WG_TMP" "$TARGET:/tmp/wg-autostart.sh"
+rm -f "$WG_TMP"
+ssh -t "$TARGET" 'bash /tmp/wg-autostart.sh; rm -f /tmp/wg-autostart.sh'
 
 echo -e "\n${GREEN}${BOLD}Nœud $IP prêt.${NC}"
 echo -e "${BOLD}Dernier pas, côté contrôle :${NC} ajoute la ligne au Caddyfile puis recharge :"
