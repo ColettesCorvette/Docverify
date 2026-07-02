@@ -3,6 +3,7 @@ package docverify
 import (
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -247,6 +248,9 @@ func normalizeRawDate(s string) string {
 	}
 	// DDMMYYYY
 	if collapsedRe.MatchString(s) {
+		if !plausibleDDMMYYYY(s) {
+			return s // laisse tel quel : parseDate échouera, le token est écarté
+		}
 		return s[0:2] + "/" + s[2:4] + "/" + s[4:]
 	}
 	// DD.MM.YYYY (points, format CNI française) → DD/MM/YYYY
@@ -262,6 +266,22 @@ var (
 	dotRe       = regexp.MustCompile(`^\d{1,2}\.\d{1,2}\.\d{4}$`)
 )
 
+// plausibleDDMMYYYY rejette un token de 8 chiffres collés dont
+// l'interprétation DDMMYYYY n'est pas un jour/mois/année plausible. Une
+// référence client à 8 chiffres (ex. 11122023) reste syntaxiquement un
+// jour/mois/année valide pour time.Parse — cette passe filtre au moins les
+// valeurs hors bornes usuelles (année hors 1900-2099) qu'aucun format de
+// date stricte n'écarterait.
+func plausibleDDMMYYYY(s string) bool {
+	if !collapsedRe.MatchString(s) {
+		return true // pas un token collé, rien à filtrer ici
+	}
+	day, _ := strconv.Atoi(s[0:2])
+	month, _ := strconv.Atoi(s[2:4])
+	year, _ := strconv.Atoi(s[4:8])
+	return day >= 1 && day <= 31 && month >= 1 && month <= 12 && year >= 1900 && year <= 2099
+}
+
 // Patterns de labels précédant une date sur les documents d'identité.
 // On cherche le label dans les ~60 caractères avant la date dans le texte normalisé.
 var (
@@ -269,6 +289,14 @@ var (
 	expiryLabelRe = regexp.MustCompile(`(?i)(expir|expiry|expiration|validit|d['']expir)`)
 	issueLabelRe  = regexp.MustCompile(`(?i)(d[eé]livr|issue|émission|emit|délivrance)`)
 )
+
+// invoiceDateLabelRe détecte un contexte de datation explicite avant une
+// date de facture/courrier : "date" (n'importe où dans les 60 caractères
+// précédents), ou "émis le" / "facture du" / un simple "le" immédiatement
+// avant la date (fréquent en tête de ligne OCR : "Le 15/03/2026"). Sert à
+// préférer cette date à un nombre qui matche accidentellement un format de
+// date (référence client, n° de facture...).
+var invoiceDateLabelRe = regexp.MustCompile(`(?i)date|(?:[eé]mis\s+le|facture\s+du|\ble)\s*:?\s*$`)
 
 // dateEntry associe une date à son contexte textuel (label trouvé avant elle)
 type dateEntry struct {
@@ -387,18 +415,41 @@ func formatDate(raw string) string {
 	return raw
 }
 
-// extractDate retourne la première date trouvée (pour factures/courriers).
+// extractDate retourne la date de facture/courrier la plus probable : en
+// priorité une date immédiatement précédée d'un mot-clé de datation (date,
+// émis le, facture du, le en tête de ligne), pour ne pas confondre une
+// référence client à 8 chiffres avec la date du document. À défaut, retombe
+// sur la première date plausible du texte (comportement historique, conservé
+// pour ne pas casser le bench).
 func extractDate(text string) (time.Time, string, bool) {
 	normalized := strings.Join(strings.Fields(text), " ")
-	matches := dateTokenRe.FindAllString(strings.ToLower(normalized), -1)
-	for _, match := range matches {
-		raw := strings.TrimSpace(match)
-		norm := normalizeRawDate(raw)
-		if t, ok := parseDate(norm); ok {
+	normLow := strings.ToLower(normalized)
+
+	allMatches := dateTokenRe.FindAllStringIndex(normLow, -1)
+
+	var fallbackT time.Time
+	var fallbackRaw string
+	haveFallback := false
+
+	for _, loc := range allMatches {
+		raw := strings.TrimSpace(normalized[loc[0]:loc[1]])
+		t, ok := parseDate(normalizeRawDate(raw))
+		if !ok {
+			continue
+		}
+
+		ctxStart := loc[0] - 60
+		if ctxStart < 0 {
+			ctxStart = 0
+		}
+		if invoiceDateLabelRe.MatchString(normLow[ctxStart:loc[0]]) {
 			return t, raw, true
 		}
+		if !haveFallback {
+			fallbackT, fallbackRaw, haveFallback = t, raw, true
+		}
 	}
-	return time.Time{}, "", false
+	return fallbackT, fallbackRaw, haveFallback
 }
 
 // --- Recherche de nom ---

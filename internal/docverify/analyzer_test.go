@@ -162,6 +162,42 @@ func TestEvaluateVerdictFacturePostalRequis(t *testing.T) {
 	}
 }
 
+func TestPlausibleDDMMYYYY(t *testing.T) {
+	cases := []struct {
+		in   string
+		want bool
+	}{
+		{"15032026", true},  // 15/03/2026 plausible
+		{"01011800", false}, // année hors 1900-2099
+		{"32132023", false}, // jour 32 et mois 13 hors bornes
+		{"abcdefgh", true},  // pas un token collé (non numérique) → rien à filtrer ici
+	}
+	for _, c := range cases {
+		if got := plausibleDDMMYYYY(c.in); got != c.want {
+			t.Errorf("plausibleDDMMYYYY(%q) = %v, attendu %v", c.in, got, c.want)
+		}
+	}
+}
+
+func TestExtractDatePrefersKeywordOverReference(t *testing.T) {
+	text := "Référence client : 11122023 Date d'émission : 15/03/2026"
+	_, raw, found := extractDate(text)
+	if !found {
+		t.Fatal("extractDate: found=false, attendu une date")
+	}
+	if raw != "15/03/2026" {
+		t.Errorf("extractDate = %q, attendu la date étiquetée '15/03/2026', pas la référence client", raw)
+	}
+}
+
+func TestExtractDateFallsBackWithoutKeyword(t *testing.T) {
+	text := "Aucun mot-clé ici, juste 15/03/2026 quelque part"
+	_, raw, found := extractDate(text)
+	if !found || raw != "15/03/2026" {
+		t.Errorf("extractDate fallback = (%q, %v), attendu (\"15/03/2026\", true)", raw, found)
+	}
+}
+
 func TestComputeConfidence(t *testing.T) {
 	// Champs riches : nom + type + dates → scoreAnalysis élevé.
 	rich := AnalysisResult{
