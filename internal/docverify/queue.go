@@ -3,6 +3,7 @@ package docverify
 import (
 	"context"
 	"errors"
+	"io/fs"
 	"log"
 	"os"
 	"strconv"
@@ -87,6 +88,17 @@ func NewQueue(workers int) *Queue {
 	return q
 }
 
+// cleanupJobFile supprime le fichier temporaire d'un job qui n'atteindra
+// jamais runPipeline (queue saturée, client parti avant prise en charge, job
+// expiré en file) — runPipeline ne s'exécute alors jamais et son
+// `defer os.Remove` ne se déclenche pas. Double-remove bénin avec ce defer :
+// os.Remove sur un fichier déjà supprimé échoue silencieusement (ignoré).
+func cleanupJobFile(path string) {
+	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
+		log.Printf("suppression fichier temporaire %s échouée: %v", path, err)
+	}
+}
+
 // Submit pousse un job dans la queue et bloque jusqu'au résultat. Le timeout
 // est découplé : queueTimeout (45s) max pour attendre dans la file d'attente,
 // et execTimeout (120s) max pour le traitement une fois pris par un worker.
@@ -110,8 +122,10 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 	select {
 	case q.jobs <- item:
 	case <-enqueueTimer.C:
+		cleanupJobFile(job.FilePath)
 		return JobResult{Err: errQueueFull}
 	case <-ctx.Done():
+		cleanupJobFile(job.FilePath)
 		return JobResult{Err: errClientGone}
 	}
 
@@ -140,6 +154,7 @@ func (q *Queue) runWorker(id int) {
 		// Vérification si le job a déjà expiré dans la file d'attente
 		if item.queueCtx.Err() != nil {
 			log.Printf("[worker %d] job %s ignoré (expiré dans la file d'attente)", id, item.job.FilePath)
+			cleanupJobFile(item.job.FilePath)
 			continue
 		}
 

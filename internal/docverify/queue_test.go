@@ -3,6 +3,8 @@ package docverify
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"io/fs"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -64,4 +66,80 @@ func TestQueueTimeoutMapping(t *testing.T) {
 	if len(analysis.Errors) == 0 || !strings.Contains(analysis.Errors[0], "délai imparti") {
 		t.Errorf("Message d'erreur inattendu : %v", analysis.Errors)
 	}
+}
+
+// TestSubmitCleansFileOnClientGoneBeforeStart couvre le cas errClientGone
+// avant que le job n'entre dans le channel : le fichier ne doit pas fuir.
+func TestSubmitCleansFileOnClientGoneBeforeStart(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-cleanup-clientgone-*.jpg")
+	if err != nil {
+		t.Fatalf("création fichier temporaire: %v", err)
+	}
+	tmpFile.Close()
+
+	// Channel non-bufferisé, 0 worker : q.jobs <- item ne sera jamais prêt.
+	q := &Queue{jobs: make(chan queueItem)}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // annulé avant l'appel : seul ce cas est prêt dans le select
+
+	res := q.Submit(ctx, Job{FilePath: tmpFile.Name()})
+	if res.Err == nil {
+		t.Fatal("attendu une erreur (client parti), obtenu nil")
+	}
+	if _, err := os.Stat(tmpFile.Name()); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("fichier temporaire %s toujours présent après Submit", tmpFile.Name())
+	}
+}
+
+// TestSubmitCleansFileOnQueueFull couvre le cas errQueueFull : le job
+// n'entre jamais dans le channel, personne d'autre ne nettoiera.
+func TestSubmitCleansFileOnQueueFull(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-cleanup-queuefull-*.jpg")
+	if err != nil {
+		t.Fatalf("création fichier temporaire: %v", err)
+	}
+	tmpFile.Close()
+
+	// Channel non-bufferisé, 0 worker : q.jobs <- item bloque jusqu'à
+	// enqueueTimeout (5s), déclenchant errQueueFull de façon déterministe.
+	q := &Queue{jobs: make(chan queueItem)}
+
+	res := q.Submit(context.Background(), Job{FilePath: tmpFile.Name()})
+	if !errors.Is(res.Err, errQueueFull) {
+		t.Fatalf("attendu errQueueFull, obtenu %v", res.Err)
+	}
+	if _, err := os.Stat(tmpFile.Name()); !errors.Is(err, fs.ErrNotExist) {
+		t.Errorf("fichier temporaire %s toujours présent après Submit", tmpFile.Name())
+	}
+}
+
+// TestWorkerCleansFileOnExpiredQueueItem couvre le cas où le job entre bien
+// dans le channel mais expire avant d'être pris par un worker (branche
+// `continue` de runWorker).
+func TestWorkerCleansFileOnExpiredQueueItem(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-cleanup-expired-*.jpg")
+	if err != nil {
+		t.Fatalf("création fichier temporaire: %v", err)
+	}
+	tmpFile.Close()
+
+	q := NewQueue(1)
+	defer close(q.jobs)
+
+	// Contexte déjà expiré : queueCtx (dérivé) l'est aussi dès sa création,
+	// donc le worker qui dépile l'item prend systématiquement la branche
+	// `continue` (même technique que TestQueueTimeoutMapping).
+	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
+	cancel()
+
+	q.Submit(ctx, Job{FilePath: tmpFile.Name()})
+
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(tmpFile.Name()); errors.Is(err, fs.ErrNotExist) {
+			return // nettoyé, test réussi
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Errorf("fichier temporaire %s toujours présent après expiration en file", tmpFile.Name())
 }
