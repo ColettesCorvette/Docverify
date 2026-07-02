@@ -122,23 +122,40 @@ func TestAnalyzeFrom2DDOC_FallbackCPComposite(t *testing.T) {
 }
 
 func TestAnalyzeFrom2DDOC_FallbackNeCourtCircuitePasLaPasseStricte(t *testing.T) {
-	// rawEDF a une frontière de mot propre autour du CP ("24" + "17999"
-	// -> "24 17999" en texte synthétique) : la passe stricte AnalyzeText
-	// (wordBoundaryContains) doit trouver 17999 sans recours au fallback.
-	// On fournit aussi un faux code postal qui n'apparaît nulle part dans
-	// le payload, pour s'assurer que c'est bien le CP valide qui gagne et
-	// non un artefact du fallback.
-	doc, err := Parse2DDOC(rawEDF)
-	if err != nil {
-		t.Fatalf("Parse2DDOC: %v", err)
+	// DataZone construit à la main : un premier champ où "99999" (leurre) est
+	// noyé sans frontière de mot une fois l'espace ID/valeur inséré par
+	// syntheticText() ("XX 1999990" -> "99999" reste collé entre deux
+	// chiffres, comme un vrai champ composite ANTS), et un second champ où
+	// "17999" (le vrai CP) obtient une frontière propre ("YY 17999"). Le
+	// fallback sous-chaîne (strings.Contains) trouverait quand même "99999"
+	// dans "1999990" s'il tournait : c'est ce qui distingue ce cas du test
+	// voisin ci-dessus, où le leurre n'existe nulle part dans le payload. Si
+	// le fallback n'était pas correctement gardé par `!a.PostalFound`, il
+	// écraserait PostalMatch avec le leurre "99999" (premier de la liste
+	// PostalCodes) au lieu de conserver le "17999" trouvé par la passe stricte.
+	// Un troisième champ de bourrage porte le texte synthétique au-dessus de
+	// minOCRChars (30), sans quoi AnalyzeText prendrait la branche "document
+	// illisible" et laisserait PostalFound à false avant même la passe
+	// stricte — un faux négatif qui invaliderait le test.
+	d := &TwoDDoc{DataZone: "XX1999990" + ddocFieldSep + "YY17999" + ddocFieldSep + "ZZBOURRAGEBOURRAGE"}
+	input := Input{Name: "X", PostalCodes: []string{"99999", "17999"}}
+
+	text := d.syntheticText()
+	if wordBoundaryContains(text, "99999") {
+		t.Fatal("précondition invalide : le leurre 99999 ne devrait pas avoir de frontière de mot propre")
 	}
-	if !wordBoundaryContains(doc.syntheticText(), "17999") {
-		t.Fatalf("précondition invalide : wordBoundaryContains ne trouve pas 17999 sans le fallback")
+	if !strings.Contains(text, "99999") {
+		t.Fatal("précondition invalide : le leurre 99999 devrait être présent en sous-chaîne (sinon le fallback ne serait pas mis à l'épreuve)")
 	}
-	a := AnalyzeFrom2DDOC(doc, Input{Name: "LEROY", Surname: "PIERRE", PostalCodes: []string{"99999", "17999"}})
+	if !wordBoundaryContains(text, "17999") {
+		t.Fatal("précondition invalide : 17999 devrait avoir une frontière de mot propre")
+	}
+
+	a := AnalyzeFrom2DDOC(d, input)
 
 	if !a.PostalFound || a.PostalMatch != "17999" {
-		t.Errorf("PostalMatch = %q (found=%v), attendu 17999 via la passe stricte", a.PostalMatch, a.PostalFound)
+		t.Errorf("PostalFound=%v PostalMatch=%q, attendu PostalFound=true PostalMatch=\"17999\" (la passe stricte doit gagner ; le fallback ne doit ni tourner ni écraser avec le leurre)",
+			a.PostalFound, a.PostalMatch)
 	}
 }
 
