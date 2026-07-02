@@ -140,13 +140,23 @@ func decodeDdocDate(h string) (time.Time, bool) {
 }
 
 // syntheticText reconstruit un texte exploitable par AnalyzeText à partir des
-// champs de données, un champ par ligne. Les codes de champ et séparateurs ne
-// gênent pas : la recherche de nom et de code postal travaille par inclusion.
+// champs de données, un champ par ligne. Chaque champ 2D-DOC commence par un
+// ID de 2 caractères collé directement à sa valeur (ex. "2417999" = ID "24"
+// pour le code postal + valeur "17999") : sans séparateur, wordBoundaryContains
+// ne trouve pas de frontière \b entre deux suites de chiffres collées. On
+// insère donc un espace après l'ID pour restaurer une frontière de mot autour
+// de la valeur.
 func (d *TwoDDoc) syntheticText() string {
 	var b strings.Builder
 	for _, f := range strings.Split(d.DataZone, ddocFieldSep) {
 		if f = strings.TrimSpace(f); f != "" {
-			b.WriteString(f)
+			if len(f) >= 2 {
+				b.WriteString(f[:2])
+				b.WriteByte(' ')
+				b.WriteString(f[2:])
+			} else {
+				b.WriteString(f)
+			}
 			b.WriteByte('\n')
 		}
 	}
@@ -162,6 +172,24 @@ func AnalyzeFrom2DDOC(d *TwoDDoc, input Input) AnalysisResult {
 	a := AnalyzeText(d.syntheticText(), input)
 	a.DocType = DocTypeInvoice
 	a.Unreadable = false
+
+	// Les données 2D-DOC sont signées et structurées, pas du texte OCR bruité :
+	// le risque que wordBoundaryContains corrige (faux positif téléphone/SIRET
+	// dans une facture OCRisée) ne s'applique pas ici. Les champs 2D-DOC
+	// concatènent parfois plusieurs sous-valeurs sans séparateur (ex. adresse
+	// structurée ANTS : pays+CP+n° de voie collés), ce qui peut faire échouer
+	// la frontière de mot alors que le CP est bien présent en sous-chaîne. On
+	// revalide donc en sous-chaîne directe si la passe stricte n'a rien trouvé.
+	if !a.PostalFound {
+		text := d.syntheticText()
+		for _, cp := range input.PostalCodes {
+			if cp != "" && strings.Contains(text, cp) {
+				a.PostalFound = true
+				a.PostalMatch = cp
+				break
+			}
+		}
+	}
 
 	if !d.EmitDate.IsZero() {
 		validMonths := input.ValidMonths

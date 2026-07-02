@@ -231,6 +231,11 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 			return
 		}
 
+		if strings.TrimSpace(r.FormValue("postal_code")) == "" {
+			writeJSONError(w, http.StatusBadRequest, "Champ 'postal_code' requis")
+			return
+		}
+
 		file, header, err := r.FormFile("doc")
 		if err != nil {
 			writeJSONError(w, http.StatusBadRequest, "Champ 'doc' manquant")

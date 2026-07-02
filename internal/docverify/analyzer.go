@@ -454,6 +454,38 @@ func extractDate(text string) (time.Time, string, bool) {
 
 // --- Recherche de nom ---
 
+// accentReplacer retire les diacritiques usuels du français (translittération
+// ASCII simple), stdlib seulement (pas de golang.org/x/text). Appliqué après
+// ToUpper : compare "FRANÇOIS" attendu à "FRANCOIS" tel que l'OCR le rend
+// souvent (cédille/accent perdu).
+var accentReplacer = strings.NewReplacer(
+	"À", "A", "Á", "A", "Â", "A", "Ã", "A", "Ä", "A", "Å", "A",
+	"Æ", "AE",
+	"Ç", "C",
+	"È", "E", "É", "E", "Ê", "E", "Ë", "E",
+	"Ì", "I", "Í", "I", "Î", "I", "Ï", "I",
+	"Ñ", "N",
+	"Ò", "O", "Ó", "O", "Ô", "O", "Õ", "O", "Ö", "O",
+	"Ù", "U", "Ú", "U", "Û", "U", "Ü", "U",
+	"Ý", "Y",
+	"Œ", "OE",
+)
+
+// wordBoundaryContains vérifie que needle apparaît dans haystack sur une
+// frontière de mot, pas comme sous-chaîne brute. Empêche un nom court
+// ("LE") ou un code postal de matcher à l'intérieur d'un mot plus long ou
+// d'une suite de chiffres (téléphone, SIRET).
+func wordBoundaryContains(haystack, needle string) bool {
+	if needle == "" {
+		return false
+	}
+	re, err := regexp.Compile(`\b` + regexp.QuoteMeta(needle) + `\b`)
+	if err != nil {
+		return strings.Contains(haystack, needle) // filet de sécurité, ne devrait jamais arriver
+	}
+	return re.MatchString(haystack)
+}
+
 // searchName cherche un nom (et optionnellement un prénom) dans le texte OCR.
 // Stratégies testées dans l'ordre :
 //  1. Nom seul présent
@@ -464,12 +496,12 @@ func extractDate(text string) (time.Time, string, bool) {
 //
 // Retourne (nameFound, surnameFound, description).
 func searchName(text, name, surname string) (bool, bool, string) {
-	upper := strings.ToUpper(text)
-	uName := strings.ToUpper(strings.TrimSpace(name))
-	uSurname := strings.ToUpper(strings.TrimSpace(surname))
+	upper := accentReplacer.Replace(strings.ToUpper(text))
+	uName := accentReplacer.Replace(strings.ToUpper(strings.TrimSpace(name)))
+	uSurname := accentReplacer.Replace(strings.ToUpper(strings.TrimSpace(surname)))
 
-	nameFound := uName != "" && strings.Contains(upper, uName)
-	surnameFound := uSurname != "" && strings.Contains(upper, uSurname)
+	nameFound := uName != "" && wordBoundaryContains(upper, uName)
+	surnameFound := uSurname != "" && wordBoundaryContains(upper, uSurname)
 
 	// Cas : nom seul (pas de prénom fourni)
 	if uSurname == "" {
@@ -544,7 +576,7 @@ func AnalyzeText(text string, input Input) AnalysisResult {
 	} else {
 		foundPostal := ""
 		for _, cp := range input.PostalCodes {
-			if strings.Contains(text, cp) {
+			if wordBoundaryContains(text, cp) {
 				foundPostal = cp
 				break
 			}

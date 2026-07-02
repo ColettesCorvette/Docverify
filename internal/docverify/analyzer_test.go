@@ -112,6 +112,38 @@ func TestSearchName(t *testing.T) {
 	}
 }
 
+func TestSearchNameAccentInsensitive(t *testing.T) {
+	found, _, _ := searchName("PIECE AU NOM DE FRANCOIS MARTIN", "FRANÇOIS", "")
+	if !found {
+		t.Error("searchName devrait matcher FRANÇOIS malgré le F sans cédille OCRisé")
+	}
+}
+
+func TestSearchNameWordBoundary(t *testing.T) {
+	if found, _, _ := searchName("UNE TABLETTE POSEE SUR LA TABLE", "LE", ""); found {
+		t.Error("searchName ne devrait pas matcher 'LE' à l'intérieur de 'TABLETTE'/'TABLE'")
+	}
+	if found, _, _ := searchName("MERCI DE VOUS ADRESSER A MONSIEUR LE MAIRE", "LE", ""); !found {
+		t.Error("searchName devrait matcher 'LE' isolé")
+	}
+}
+
+func TestAnalyzeTextPostalWordBoundary(t *testing.T) {
+	text := "FACTURE Total TTC TVA Tel: 0600000000"
+	result := AnalyzeText(text, Input{Name: "X", PostalCodes: []string{"99000"}})
+	if result.PostalFound {
+		t.Error("PostalFound=true, le code postal ne devrait pas matcher à l'intérieur d'un numéro de téléphone")
+	}
+}
+
+func TestAnalyzeTextPostalWordBoundaryPositive(t *testing.T) {
+	text := "FACTURE Total TTC TVA 99000 VILLEFRANCHE"
+	result := AnalyzeText(text, Input{Name: "X", PostalCodes: []string{"99000"}})
+	if !result.PostalFound {
+		t.Error("PostalFound=false, le code postal isolé aurait dû matcher")
+	}
+}
+
 func TestScoreAnalysis(t *testing.T) {
 	// DocType doit être explicitement DocTypeUnknown : le zero-value "" de
 	// DocType compterait à tort (""!="inconnu"). En pratique AnalyzeText

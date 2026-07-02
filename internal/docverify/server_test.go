@@ -81,3 +81,25 @@ func TestSupportingDocumentRejectsContentExtMismatch(t *testing.T) {
 		t.Fatalf("attendu 400, obtenu %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+func TestSupportingDocumentRejectsEmptyPostalCode(t *testing.T) {
+	q := &Queue{}
+	handler := makeSupportingDocumentHandler(q)
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	part, _ := w.CreateFormFile("doc", "doc.pdf")
+	part.Write([]byte("%PDF-1.4\n%%EOF"))
+	w.WriteField("name", "DUPONT")
+	w.WriteField("postal_code", "")
+	w.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/supporting-documents", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("attendu 400 pour postal_code vide, obtenu %d: %s", rec.Code, rec.Body.String())
+	}
+}
