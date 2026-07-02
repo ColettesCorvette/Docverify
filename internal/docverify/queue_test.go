@@ -184,3 +184,12 @@ func TestSubmitRealCancelIsClientGone(t *testing.T) {
 		t.Fatalf("attendu errClientGone (annulation réelle), obtenu %v", res.Err)
 	}
 }
+
+// TestDefaultWorkersMatchesProd vérifie que DefaultWorkers() retourne 1
+// (aligné sur la prod : un seul GPU Metal ne parallélise pas).
+func TestDefaultWorkersMatchesProd(t *testing.T) {
+	t.Setenv("QUEUE_WORKERS", "")
+	if got := DefaultWorkers(); got != 1 {
+		t.Errorf("DefaultWorkers() = %d, attendu 1 (aligné prod, un seul GPU Metal)", got)
+	}
+}

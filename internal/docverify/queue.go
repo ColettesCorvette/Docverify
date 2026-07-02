@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	defaultWorkers = 5
+	defaultWorkers = 1
 	jobBufferSize  = 100
 	queueTimeout   = 45 * time.Second
 	execTimeout    = 120 * time.Second

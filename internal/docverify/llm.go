@@ -92,10 +92,11 @@ var (
 )
 
 // InitLLMSemaphore crée le sémaphore qui borne les appels LLM concurrents.
-// La capacité est lue depuis LLM_MAX_CONCURRENT (défaut 4). Doit être appelé
-// une fois, avant tout appel à RunLLM.
+// La capacité est lue depuis LLM_MAX_CONCURRENT (défaut 1, aligné sur la prod :
+// un seul GPU Metal ne parallélise pas). Doit être appelé une fois, avant tout
+// appel à RunLLM.
 func InitLLMSemaphore() {
-	n := 4
+	n := 1
 	if v := os.Getenv("LLM_MAX_CONCURRENT"); v != "" {
 		if parsed, err := strconv.Atoi(v); err == nil && parsed > 0 {
 			n = parsed
