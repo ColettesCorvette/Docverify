@@ -139,13 +139,19 @@ type asyncCallback struct {
 	Error  string          `json:"error,omitempty"`
 }
 
+// asyncBudget borne le traitement complet d'un job asynchrone : le pire cas
+// queue (queueTimeout d'attente + execTimeout d'exécution) plus une marge de
+// sécurité, pour ne jamais couper un job qu'un worker a pris en charge
+// tardivement mais dans les règles.
+const asyncBudget = queueTimeout + execTimeout + 15*time.Second
+
 // processAsync exécute le job hors de la connexion HTTP initiale (le client a
 // déjà reçu son 202 + job_id), puis POST le verdict au callback_url. Le contexte
 // est indépendant de la requête : la fin du handler ne doit pas annuler le
 // traitement. Le job passe par la même queue que le mode synchrone, donc il
 // respecte la limite de workers.
 func processAsync(q *Queue, job Job, jobID, callbackURL string) {
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), asyncBudget)
 	defer cancel()
 
 	res := q.Submit(ctx, job)

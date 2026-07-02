@@ -295,7 +295,7 @@ func handlePipelineError(w http.ResponseWriter, err error) {
 		w.WriteHeader(statusClientClosed)
 	case errors.Is(err, errQueueFull):
 		writeJSONError(w, http.StatusServiceUnavailable, err.Error())
-	case errors.Is(err, errTimeout) || errors.Is(err, errQueueTimeout):
+	case errors.Is(err, errTimeout) || errors.Is(err, errQueueTimeout) || errors.Is(err, errClientTimeout):
 		log.Printf("Pipeline timeout (%v) — verdict unreadable renvoyé", err)
 		unreadable := AnalysisResult{
 			DocType:    DocTypeUnknown,

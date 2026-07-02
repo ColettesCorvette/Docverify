@@ -10,6 +10,16 @@ import (
 	"time"
 )
 
+func TestAsyncBudgetCoversWorstCaseQueue(t *testing.T) {
+	want := queueTimeout + execTimeout + 15*time.Second
+	if asyncBudget != want {
+		t.Fatalf("asyncBudget = %v, attendu %v (queueTimeout+execTimeout+marge)", asyncBudget, want)
+	}
+	if asyncBudget <= queueTimeout+execTimeout {
+		t.Fatal("asyncBudget doit couvrir le pire cas queueTimeout+execTimeout avec marge")
+	}
+}
+
 var uuidV4Re = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 func TestNewRequestID(t *testing.T) {

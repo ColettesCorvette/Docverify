@@ -126,7 +126,7 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 		return JobResult{Err: errQueueFull}
 	case <-ctx.Done():
 		cleanupJobFile(job.FilePath)
-		return JobResult{Err: errClientGone}
+		return JobResult{Err: ctxDoneErr(ctx)}
 	}
 
 	// Attente du démarrage de l'exécution par un worker ou du timeout d'attente
@@ -135,7 +135,7 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 		// Le job a commencé son exécution !
 	case <-queueCtx.Done():
 		if ctx.Err() != nil {
-			return JobResult{Err: errClientGone}
+			return JobResult{Err: ctxDoneErr(ctx)}
 		}
 		return JobResult{Err: errQueueTimeout}
 	}
@@ -145,7 +145,7 @@ func (q *Queue) Submit(ctx context.Context, job Job) JobResult {
 	case res := <-resultCh:
 		return res
 	case <-ctx.Done():
-		return JobResult{Err: errClientGone}
+		return JobResult{Err: ctxDoneErr(ctx)}
 	}
 }
 
@@ -318,8 +318,22 @@ type queueErr string
 func (e queueErr) Error() string { return string(e) }
 
 const (
-	errQueueTimeout queueErr = "queue timeout: le job a attendu trop longtemps dans la file sans être pris en charge"
-	errTimeout      queueErr = "timeout: pipeline OCR + analyse n'a pas répondu dans le délai d'exécution imparti"
-	errQueueFull    queueErr = "queue saturée: réessayez plus tard"
-	errClientGone   queueErr = "requête annulée par le client"
+	errQueueTimeout  queueErr = "queue timeout: le job a attendu trop longtemps dans la file sans être pris en charge"
+	errTimeout       queueErr = "timeout: pipeline OCR + analyse n'a pas répondu dans le délai d'exécution imparti"
+	errQueueFull     queueErr = "queue saturée: réessayez plus tard"
+	errClientGone    queueErr = "requête annulée par le client"
+	errClientTimeout queueErr = "timeout: le budget alloué au traitement a expiré avant la fin du job"
 )
+
+// ctxDoneErr traduit l'annulation d'un contexte parent en erreur exacte :
+// deadline dépassée (timeout, y compris le budget interne du mode async) vs
+// annulation réelle (client HTTP déconnecté). Go distingue les deux via
+// context.DeadlineExceeded / context.Canceled, quel que soit qui a posé le
+// timeout — la synchronisation http.Request.Context() n'a pas de deadline
+// propre, donc son ctx.Done() ne peut venir que d'une vraie déconnexion.
+func ctxDoneErr(ctx context.Context) error {
+	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+		return errClientTimeout
+	}
+	return errClientGone
+}

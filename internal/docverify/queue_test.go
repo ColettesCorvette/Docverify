@@ -143,3 +143,44 @@ func TestWorkerCleansFileOnExpiredQueueItem(t *testing.T) {
 	}
 	t.Errorf("fichier temporaire %s toujours présent après expiration en file", tmpFile.Name())
 }
+
+// TestSubmitDeadlineIsTimeoutNotClientGone : un contexte parent dont la
+// DEADLINE expire (le budget interne du mode async, par ex.) doit être
+// rapporté comme un timeout, pas comme une annulation client.
+func TestSubmitDeadlineIsTimeoutNotClientGone(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-deadline-*.jpg")
+	if err != nil {
+		t.Fatalf("création fichier temporaire: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	q := &Queue{jobs: make(chan queueItem)} // 0 worker : q.jobs<-item ne se termine jamais
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+
+	res := q.Submit(ctx, Job{FilePath: tmpFile.Name()})
+	if !errors.Is(res.Err, errClientTimeout) {
+		t.Fatalf("attendu errClientTimeout (deadline dépassée), obtenu %v", res.Err)
+	}
+}
+
+// TestSubmitRealCancelIsClientGone : une annulation réelle (pas une
+// deadline) doit rester rapportée comme errClientGone.
+func TestSubmitRealCancelIsClientGone(t *testing.T) {
+	tmpFile, err := os.CreateTemp("", "test-cancel-*.jpg")
+	if err != nil {
+		t.Fatalf("création fichier temporaire: %v", err)
+	}
+	defer os.Remove(tmpFile.Name())
+	tmpFile.Close()
+
+	q := &Queue{jobs: make(chan queueItem)}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	res := q.Submit(ctx, Job{FilePath: tmpFile.Name()})
+	if !errors.Is(res.Err, errClientGone) {
+		t.Fatalf("attendu errClientGone (annulation réelle), obtenu %v", res.Err)
+	}
+}
