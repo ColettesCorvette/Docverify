@@ -42,10 +42,10 @@ fire() { # label fichier champs...
 echo "Rafale : $((ROUNDS * 4)) requêtes simultanées vers $API"
 start=$(date +%s)
 for r in $(seq 1 "$ROUNDS"); do
-    fire "cni8493" index_8493_1_1200.png   -F "name=BEN AMAR"                       > "$OUT/cni8493.$r.json" &
-    fire "solange" carte_identite_Solange.png -F "name=DURAND" -F "surname=SOLANGE" > "$OUT/solange.$r.json" &
-    fire "cni8498" index_8498_1_1200.png   -F "name=DELAUNAY" -F "surname=CAMILLE"> "$OUT/cni8498.$r.json" &
-    fire "lucie"   carte_identite_Lucie.jpg -F "name=DELAUNAY" -F "surname=LUCIE"> "$OUT/lucie.$r.json" &
+    fire "cni8493" index_8493_1_1200.png   -F "name=BEN AMAR" -F "postal_code=99000"                       > "$OUT/cni8493.$r.json" &
+    fire "solange" carte_identite_Solange.png -F "name=DURAND" -F "surname=SOLANGE" -F "postal_code=99000" > "$OUT/solange.$r.json" &
+    fire "cni8498" index_8498_1_1200.png   -F "name=DELAUNAY" -F "surname=CAMILLE" -F "postal_code=99000"> "$OUT/cni8498.$r.json" &
+    fire "lucie"   carte_identite_Lucie.jpg -F "name=DELAUNAY" -F "surname=LUCIE" -F "postal_code=99000"> "$OUT/lucie.$r.json" &
 done
 wait
 elapsed=$(( $(date +%s) - start ))

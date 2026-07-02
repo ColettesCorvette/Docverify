@@ -33,12 +33,12 @@ SPECS=(
     "edf|facture-EDF.jpg|name=DUPONT&postal_code=31520"
     "freepro|Facture_FreePro_F202603049358_20260301.pdf|name=ORBINEA&postal_code=99000"
     "sfr|sfr-facture-1.pdf|name=ORBINEA&postal_code=99000"
-    "lucie|carte_identite_Lucie.jpg|name=DELAUNAY&surname=LUCIE"
-    "cni8493|index_8493_1_1200.png|name=BEN AMAR"
-    "cni8498|index_8498_1_1200.png|name=DELAUNAY&surname=CAMILLE"
+    "lucie|carte_identite_Lucie.jpg|name=DELAUNAY&surname=LUCIE&postal_code=99000"
+    "cni8493|index_8493_1_1200.png|name=BEN AMAR&postal_code=99000"
+    "cni8498|index_8498_1_1200.png|name=DELAUNAY&surname=CAMILLE&postal_code=99000"
     "justif-jpg|justifs.jpg|name=LEROY&surname=PIERRE&postal_code=17999"
     "justif-pdf|justif2.pdf|name=ORBINEA&postal_code=99000"
-    "solange|carte_identite_Solange.png|name=DURAND&surname=SOLANGE"
+    "solange|carte_identite_Solange.png|name=DURAND&surname=SOLANGE&postal_code=99000"
     "impot|impot_exemple.pdf|name=DURAND&surname=SOLANGE&postal_code=99000"
 )
 

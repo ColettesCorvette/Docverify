@@ -67,17 +67,17 @@ test_check_facture_sfr() {
 
 test_check_cni_lucie() {
     separator "CNI Lucie — DELAUNAY LUCIE"
-    post_doc -F "doc=@$SAMPLES/carte_identite_Lucie.jpg" -F "name=DELAUNAY" -F "surname=LUCIE" -F "model=$MODEL"
+    post_doc -F "doc=@$SAMPLES/carte_identite_Lucie.jpg" -F "name=DELAUNAY" -F "surname=LUCIE" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_cni_8493() {
     separator "CNI index_8493 — BEN AMAR"
-    post_doc -F "doc=@$SAMPLES/index_8493_1_1200.png" -F "name=BEN AMAR" -F "model=$MODEL"
+    post_doc -F "doc=@$SAMPLES/index_8493_1_1200.png" -F "name=BEN AMAR" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_cni_8498() {
     separator "CNI index_8498 — DELAUNAY CAMILLE"
-    post_doc -F "doc=@$SAMPLES/index_8498_1_1200.png" -F "name=DELAUNAY" -F "surname=CAMILLE" -F "model=$MODEL"
+    post_doc -F "doc=@$SAMPLES/index_8498_1_1200.png" -F "name=DELAUNAY" -F "surname=CAMILLE" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_justif_jpg() {
@@ -92,7 +92,7 @@ test_check_justif_pdf() {
 
 test_check_cni_solange() {
     separator "CNI Solange — DURAND SOLANGE"
-    post_doc -F "doc=@$SAMPLES/carte_identite_Solange.png" -F "name=DURAND" -F "surname=SOLANGE" -F "model=$MODEL"
+    post_doc -F "doc=@$SAMPLES/carte_identite_Solange.png" -F "name=DURAND" -F "surname=SOLANGE" -F "postal_code=99000" -F "model=$MODEL"
 }
 
 test_check_impot() {
