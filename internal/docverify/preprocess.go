@@ -57,7 +57,7 @@ func preprocessImage(ctx context.Context, imagePath string) (string, func()) {
 	)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("   Prétraitement image échoué: %s", strings.TrimSpace(string(out)))
+		log.Printf("   Prétraitement image échoué: %s (%v)", strings.TrimSpace(string(out)), err)
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}
 	}

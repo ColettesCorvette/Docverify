@@ -45,7 +45,7 @@ post_doc() {
     body="${out%$'\n'*}"
     grep -i '^X-Request-Id:' "$headers" | tr -d '\r'
     rm -f "$headers"
-    echo "$body" | jq
+    echo "$body" | jq . 2>/dev/null || echo "$body"
     if [ "$code" = "200" ]; then
         echo -e "${GREEN}✓ HTTP 200${NC}"
     else
