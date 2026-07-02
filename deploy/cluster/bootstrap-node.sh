@@ -25,7 +25,7 @@ BOLD='\033[1m'; NC='\033[0m'
 
 IP="${1:-}"
 SSH_USER="${2:-cluster}"
-MODEL="${MODEL:-hf.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M}"
+MODEL="${MODEL:-huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M}"
 # Source de vérité du CA = celui que Docker truste déjà sur le contrôle.
 CA_SRC="${CA_SRC:-$HOME/.docker/certs.d/alpha.srv.orbinea:5000/ca.crt}"
 

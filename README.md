@@ -37,7 +37,7 @@ Le cluster regroupe plusieurs Mac Minis autonomes, Mac principal inclus qui sert
 | Projet | Rôle |
 |---|---|
 | [Docker Model Runner](https://docs.docker.com/ai/model-runner/) | Sert un GGUF en endpoint OpenAI-compatible sur GPU Metal, en process hôte |
-| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage par défaut, `hf.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M` |
+| [Gemma 4 E4B](https://huggingface.co/unsloth/gemma-4-e4b-it-gguf) | Modèle vision-langage par défaut, `huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M` |
 | [k3d](https://k3d.io) | k3s en conteneurs Docker pour le cluster local |
 
 ## Développer et tester en local
@@ -64,7 +64,7 @@ Route, champs et mode webhook sur la page wiki [API HTTP](https://git.int.orbine
 Backend LLM = Docker Model Runner, activé dans Docker Desktop avec le TCP host-side. On pull le modèle une fois par Mac, puis deux chemins selon la cible.
 
 ```bash
-docker model pull hf.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M   # backend LLM, une fois par Mac
+docker model pull huggingface.co/unsloth/gemma-4-e4b-it-gguf:Q5_K_M   # backend LLM, une fois par Mac
 
 ./scripts/redeploy.sh         # DEV LOCAL : build + import k3d + override local, sans registre
 ./scripts/deploy-cluster.sh   # CLUSTER : build + push registre, puis rollout de chaque nœud
@@ -101,4 +101,4 @@ Le dossier `scripts/` regroupe l'outillage de dev et d'exploitation. Les paramè
 
 Quatre Mac Mini M4 Pro 12 cœurs en shared-nothing, un nœud k3d autonome et un DMR local par machine. Le principal, 48 Go, sert de poste de dev, de front Load Balancer et de worker. Trois Mac de 24 Go complètent le cluster.
 
-Pour tenir dans 24 Go, le modèle de production est quantisé en `Q4_K_M`, 4.62 GiB, ce qui libère 3 Go de VRAM par nœud à 100% de justesse au benchmark. Le découplage du cycle de vie des tâches, timeout d'attente court en file et timeout d'exécution garanti pour le worker, encaisse les rafales intenses sans crash ni timeout.
+Pour tenir dans 24 Go, le modèle de production est quantisé en `Q5_K_M`, 5,09 GiB, choisi contre `Q8` pour l'économie de VRAM, à 100% de justesse au benchmark. Le découplage du cycle de vie des tâches, timeout d'attente court en file et timeout d'exécution garanti pour le worker, encaisse les rafales intenses sans crash ni timeout.
