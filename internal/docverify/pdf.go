@@ -3,6 +3,7 @@ package docverify
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,18 +28,18 @@ const minTextChars = 50
 func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, bool, error) {
 	// 1. Tenter pdftotext en premier
 	if text, ok := tryPDFToText(ctx, pdfPath); ok {
-		fmt.Println("   Type PDF      : texte natif (pdftotext)")
+		log.Println("   Type PDF      : texte natif (pdftotext)")
 		return text, false, nil
 	}
 
 	// 2. PDF scanné : convertir en image puis OCR
-	fmt.Println("   Type PDF      : scanné → conversion image + OCR")
+	log.Println("   Type PDF      : scanné → conversion image + OCR")
 	imgPath, cleanup, err := convertPDFToImage(ctx, pdfPath)
 	if err != nil {
 		return "", false, err
 	}
 	defer cleanup()
-	fmt.Printf("   Image générée : %s\n", imgPath)
+	log.Printf("   Image générée : %s", imgPath)
 
 	return ExtractText(ctx, imgPath, model, llmURL)
 }
@@ -48,7 +49,7 @@ func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, boo
 // (vide, false) si pdftotext est absent ou si le PDF est scanné.
 func tryPDFToText(ctx context.Context, pdfPath string) (string, bool) {
 	if _, err := exec.LookPath("pdftotext"); err != nil {
-		fmt.Println("   ⚠️  pdftotext absent (brew install poppler) — bascule OCR image")
+		log.Println("   pdftotext absent (brew install poppler) — bascule OCR image")
 		return "", false
 	}
 
@@ -62,7 +63,7 @@ func tryPDFToText(ctx context.Context, pdfPath string) (string, bool) {
 
 	// Si le texte extrait est trop court, le PDF est probablement scanné
 	if len([]rune(text)) < minTextChars {
-		fmt.Printf("   ⚠️  pdftotext : seulement %d caractères extraits → PDF scanné\n", len([]rune(text)))
+		log.Printf("   pdftotext : seulement %d caractères extraits → PDF scanné\n", len([]rune(text)))
 		return "", false
 	}
 

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -282,11 +283,11 @@ func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (s
 		return "", err
 	}
 	if len(regions) < 2 {
-		fmt.Printf("   Segmentation : %d zone(s) détectée(s), bascule inutile\n", len(regions))
+		log.Printf("   Segmentation : %d zone(s) détectée(s), bascule inutile", len(regions))
 		return "", nil
 	}
 
-	fmt.Printf("   Segmentation : %d zones détectées\n", len(regions))
+	log.Printf("   Segmentation : %d zones détectées", len(regions))
 
 	zonesDir, err := os.MkdirTemp("", "docverify-zones-*")
 	if err != nil {
@@ -305,10 +306,10 @@ func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (s
 	for i, r := range regions {
 		cropPath := filepath.Join(zonesDir, fmt.Sprintf("zone-%02d.png", i+1))
 		if err := cropRegion(ctx, imagePath, r, cropPath, 20); err != nil {
-			fmt.Printf("   Crop zone %d échoué: %v\n", i+1, err)
+			log.Printf("   Crop zone %d échoué: %v", i+1, err)
 			continue
 		}
-		fmt.Printf("   Zone %d/%d %dx%d à (%d,%d)\n",
+		log.Printf("   Zone %d/%d %dx%d à (%d,%d)",
 			i+1, len(regions), r.Width, r.Height, r.X, r.Y)
 
 		wg.Add(1)
@@ -326,7 +327,7 @@ func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (s
 	byIdx := make(map[int]string, len(regions))
 	for r := range results {
 		if r.err != nil {
-			fmt.Printf("   OCR zone %d échoué: %v\n", r.idx+1, r.err)
+			log.Printf("   OCR zone %d échoué: %v", r.idx+1, r.err)
 			continue
 		}
 		byIdx[r.idx] = r.text

@@ -2,7 +2,7 @@ package docverify
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -81,7 +81,7 @@ func hasComplexBackground(ctx context.Context, imagePath string) bool {
 		return false
 	}
 	complex := ratio < whitePixelThreshold
-	fmt.Printf("   Fond image     : %.0f%% pixels blancs → %s\n",
+	log.Printf("   Fond image     : %.0f%% pixels blancs → %s",
 		ratio*100,
 		map[bool]string{true: "complexe → LLM", false: "simple → Tesseract"}[complex])
 	return complex
@@ -104,41 +104,41 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 
 	// Étape 0 : détecter si le fond est complexe (guilloché, texturé)
 	if hasComplexBackground(ctx, imagePath) {
-		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
+		log.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
 		text, err := RunLLM(ctx, imagePath, model, llmURL)
 		return text, true, err
 	}
 
 	if !tesseractAvailable() {
-		fmt.Println("   Moteur OCR    : LLM (Tesseract absent — brew install tesseract tesseract-lang)")
+		log.Println("   Moteur OCR    : LLM (Tesseract absent — brew install tesseract tesseract-lang)")
 		text, err := RunLLM(ctx, imagePath, model, llmURL)
 		return text, true, err
 	}
 
 	// Étape 1 : Tesseract brut, meilleur PSM
-	fmt.Println("   Moteur OCR    : Tesseract (image brute)")
+	log.Println("   Moteur OCR    : Tesseract (image brute)")
 	text, q := bestTesseractResult(ctx, imagePath)
-	fmt.Printf("   Qualité OCR   : %.0f%%\n", q*100)
+	log.Printf("   Qualité OCR   : %.0f%%", q*100)
 	if q >= ocrQualityThreshold {
 		return text, false, nil
 	}
-	fmt.Printf("   Qualité insuffisante (%.0f%% < %.0f%%)\n", q*100, ocrQualityThreshold*100)
+	log.Printf("   Qualité insuffisante (%.0f%% < %.0f%%)", q*100, ocrQualityThreshold*100)
 
 	// Étape 2 : prétraitement + retry
 	if isImageMagickAvailable() {
-		fmt.Println("   Prétraitement : ImageMagick → retry Tesseract")
+		log.Println("   Prétraitement : ImageMagick → retry Tesseract")
 		pp, cleanup, _ := preprocessImage(ctx, imagePath)
 		defer cleanup()
 		text2, q2 := bestTesseractResult(ctx, pp)
-		fmt.Printf("   Qualité OCR   : %.0f%%\n", q2*100)
+		log.Printf("   Qualité OCR   : %.0f%%", q2*100)
 		if q2 >= ocrQualityThreshold {
 			return text2, false, nil
 		}
-		fmt.Printf("   Qualité insuffisante après prétraitement (%.0f%%)\n", q2*100)
+		log.Printf("   Qualité insuffisante après prétraitement (%.0f%%)", q2*100)
 	}
 
 	// Étape 3 : fallback LLM
-	fmt.Println("   Bascule sur LLM (document complexe)")
+	log.Println("   Bascule sur LLM (document complexe)")
 	text, err := RunLLM(ctx, imagePath, model, llmURL)
 	return text, true, err
 }

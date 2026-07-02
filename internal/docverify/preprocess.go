@@ -2,7 +2,7 @@ package docverify
 
 import (
 	"context"
-	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,7 +57,7 @@ func preprocessImage(ctx context.Context, imagePath string) (string, func(), err
 	)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("   Prétraitement image échoué: %s\n", strings.TrimSpace(string(out)))
+		log.Printf("   Prétraitement image échoué: %s", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}, nil
 	}
@@ -109,13 +109,13 @@ func preprocessForLLM(ctx context.Context, imagePath string) (string, func(), er
 	}
 	outPath := filepath.Join(tmpDir, "llm"+ext)
 
-	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 1280px avant LLM\n",
+	log.Printf("   Image source %.1f Mo > %d Mo : downscale 1280px avant LLM",
 		float64(info.Size())/(1<<20), llmDownscaleLimit>>20)
 
 	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(imagePath, "-resize", "1280x1280>", outPath)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		fmt.Printf("   Downscale LLM échoué: %s\n", strings.TrimSpace(string(out)))
+		log.Printf("   Downscale LLM échoué: %s", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}, nil
 	}

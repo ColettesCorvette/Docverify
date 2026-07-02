@@ -202,7 +202,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 	if err != nil {
 		return "", fmt.Errorf("encodage image: %w", err)
 	}
-	fmt.Printf("   Image encodée : %.1f Ko\n", float64(len(imgB64))/1024)
+	log.Printf("   Image encodée : %.1f Ko", float64(len(imgB64))/1024)
 
 	dataURL := fmt.Sprintf("data:%s;base64,%s", mimeFromExt(processedPath), imgB64)
 
@@ -267,7 +267,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 		return "", fmt.Errorf("contenu vide — modèle '%s' mal chargé ?", model)
 	}
 
-	fmt.Printf("   OCR terminé (%d caractères)\n", len(text))
+	log.Printf("   OCR terminé (%d caractères)", len(text))
 	return text, nil
 }
 
