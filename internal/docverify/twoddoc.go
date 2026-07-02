@@ -64,7 +64,7 @@ func Decode2DDOC(ctx context.Context, path string) (string, bool) {
 
 	imagePath := path
 	if IsPDF(path) {
-		ip, cleanup, err := convertPDFToImage(path)
+		ip, cleanup, err := convertPDFToImage(ctx, path)
 		if err != nil {
 			return "", false
 		}

@@ -60,12 +60,12 @@ func ocrQuality(text string) float64 {
 //	Passeport MAR : 3.5% de pixels blancs → LLM
 const whitePixelThreshold = 0.25 // en dessous → fond trop chargé pour Tesseract
 
-func hasComplexBackground(imagePath string) bool {
+func hasComplexBackground(ctx context.Context, imagePath string) bool {
 	if !isImageMagickAvailable() {
 		return false
 	}
 	// Ratio de pixels blancs (luminosité > 78%)
-	out, err := exec.Command("convert", imagePath,
+	out, err := exec.CommandContext(ctx, "convert", imagePath,
 		"-colorspace", "Gray",
 		"-threshold", "78%",
 		"-format", "%[fx:mean]",
@@ -101,7 +101,7 @@ func hasComplexBackground(imagePath string) bool {
 func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, bool, error) {
 
 	// Étape 0 : détecter si le fond est complexe (guilloché, texturé)
-	if hasComplexBackground(imagePath) {
+	if hasComplexBackground(ctx, imagePath) {
 		fmt.Println("   Fond complexe détecté (guilloché/sécurité) → LLM direct")
 		text, err := RunLLM(ctx, imagePath, model, llmURL)
 		return text, true, err
@@ -115,7 +115,7 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 
 	// Étape 1 : Tesseract brut, meilleur PSM
 	fmt.Println("   Moteur OCR    : Tesseract (image brute)")
-	text, q := bestTesseractResult(imagePath)
+	text, q := bestTesseractResult(ctx, imagePath)
 	fmt.Printf("   Qualité OCR   : %.0f%%\n", q*100)
 	if q >= ocrQualityThreshold {
 		return text, false, nil
@@ -125,9 +125,9 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 	// Étape 2 : prétraitement + retry
 	if isImageMagickAvailable() {
 		fmt.Println("   Prétraitement : ImageMagick → retry Tesseract")
-		pp, cleanup, _ := preprocessImage(imagePath)
+		pp, cleanup, _ := preprocessImage(ctx, imagePath)
 		defer cleanup()
-		text2, q2 := bestTesseractResult(pp)
+		text2, q2 := bestTesseractResult(ctx, pp)
 		fmt.Printf("   Qualité OCR   : %.0f%%\n", q2*100)
 		if q2 >= ocrQualityThreshold {
 			return text2, false, nil
@@ -145,7 +145,7 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 // texte ayant le meilleur score de qualité OCR. Tesseract est un process
 // externe par PSM ; les quatre invocations indépendantes tournent en
 // concurrence pour diviser la latence par ~4 quand toutes aboutissent.
-func bestTesseractResult(imagePath string) (string, float64) {
+func bestTesseractResult(ctx context.Context, imagePath string) (string, float64) {
 	modes := []string{"6", "3", "4", "11"}
 
 	type psmResult struct {
@@ -159,10 +159,10 @@ func bestTesseractResult(imagePath string) (string, float64) {
 		wg.Add(1)
 		go func(psm string) {
 			defer wg.Done()
-			out, err := exec.Command("tesseract", imagePath, "stdout",
+			out, err := exec.CommandContext(ctx, "tesseract", imagePath, "stdout",
 				"-l", "fra+eng", "--psm", psm).Output()
 			if err != nil {
-				out, err = exec.Command("tesseract", imagePath, "stdout",
+				out, err = exec.CommandContext(ctx, "tesseract", imagePath, "stdout",
 					"--psm", psm).Output()
 				if err != nil {
 					return

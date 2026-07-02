@@ -188,7 +188,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 		}
 	}
 
-	processedPath, cleanup, _ := preprocessForLLM(imagePath)
+	processedPath, cleanup, _ := preprocessForLLM(ctx, imagePath)
 	defer cleanup()
 
 	if os.Getenv("DOCVERIFY_DEBUG_OCR") == "1" {

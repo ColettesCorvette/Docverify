@@ -26,14 +26,14 @@ const minTextChars = 50
 // client (Regia) ou le timeout global du job.
 func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, bool, error) {
 	// 1. Tenter pdftotext en premier
-	if text, ok := tryPDFToText(pdfPath); ok {
+	if text, ok := tryPDFToText(ctx, pdfPath); ok {
 		fmt.Println("   Type PDF      : texte natif (pdftotext)")
 		return text, false, nil
 	}
 
 	// 2. PDF scanné : convertir en image puis OCR
 	fmt.Println("   Type PDF      : scanné → conversion image + OCR")
-	imgPath, cleanup, err := convertPDFToImage(pdfPath)
+	imgPath, cleanup, err := convertPDFToImage(ctx, pdfPath)
 	if err != nil {
 		return "", false, err
 	}
@@ -46,14 +46,14 @@ func ExtractPDF(ctx context.Context, pdfPath, model, llmURL string) (string, boo
 // tryPDFToText tente d'extraire le texte via pdftotext.
 // Retourne (texte, true) si le PDF contient suffisamment de texte natif,
 // (vide, false) si pdftotext est absent ou si le PDF est scanné.
-func tryPDFToText(pdfPath string) (string, bool) {
+func tryPDFToText(ctx context.Context, pdfPath string) (string, bool) {
 	if _, err := exec.LookPath("pdftotext"); err != nil {
 		fmt.Println("   ⚠️  pdftotext absent (brew install poppler) — bascule OCR image")
 		return "", false
 	}
 
 	// pdftotext -l 1 : première page seulement, "-" = sortie stdout
-	out, err := exec.Command("pdftotext", "-l", "1", pdfPath, "-").Output()
+	out, err := exec.CommandContext(ctx, "pdftotext", "-l", "1", pdfPath, "-").Output()
 	if err != nil {
 		return "", false
 	}
@@ -70,7 +70,7 @@ func tryPDFToText(pdfPath string) (string, bool) {
 }
 
 // convertPDFToImage convertit la première page d'un PDF en PNG via pdftoppm.
-func convertPDFToImage(pdfPath string) (imgPath string, cleanup func(), err error) {
+func convertPDFToImage(ctx context.Context, pdfPath string) (imgPath string, cleanup func(), err error) {
 	if _, lookErr := exec.LookPath("pdftoppm"); lookErr != nil {
 		return "", nil, fmt.Errorf(
 			"pdftoppm introuvable — installez poppler-utils :\n" +
@@ -86,7 +86,7 @@ func convertPDFToImage(pdfPath string) (imgPath string, cleanup func(), err erro
 
 	outPrefix := filepath.Join(tmpDir, "page")
 
-	cmd := exec.Command("pdftoppm",
+	cmd := exec.CommandContext(ctx, "pdftoppm",
 		"-r", "200",
 		"-png",
 		"-l", "1",

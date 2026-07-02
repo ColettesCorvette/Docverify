@@ -1,6 +1,7 @@
 package docverify
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -15,7 +16,7 @@ import (
 //     (la binarisation dégrade les docs avec fond guilloché)
 //
 // Retourne l'image originale si ImageMagick est absent (dégradé gracieux).
-func preprocessImage(imagePath string) (string, func(), error) {
+func preprocessImage(ctx context.Context, imagePath string) (string, func(), error) {
 	if _, err := exec.LookPath("convert"); err != nil {
 		return imagePath, func() {}, nil
 	}
@@ -31,7 +32,7 @@ func preprocessImage(imagePath string) (string, func(), error) {
 	}
 	outPath := filepath.Join(tmpDir, "preprocessed"+ext)
 
-	cmd := exec.Command("convert",
+	cmd := exec.CommandContext(ctx, "convert",
 		imagePath,
 		"-colorspace", "Gray", // niveaux de gris
 		"-normalize",                 // étire l'histogramme
@@ -71,7 +72,7 @@ const llmDownscaleLimit = 1 * (1 << 20) // 1 Mo
 //
 // Retourne l'image originale si ImageMagick est absent, si l'image est sous le
 // seuil, ou si la conversion échoue.
-func preprocessForLLM(imagePath string) (string, func(), error) {
+func preprocessForLLM(ctx context.Context, imagePath string) (string, func(), error) {
 	if !isImageMagickAvailable() {
 		return imagePath, func() {}, nil
 	}
@@ -95,7 +96,7 @@ func preprocessForLLM(imagePath string) (string, func(), error) {
 	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 1280px avant LLM\n",
 		float64(info.Size())/(1<<20), llmDownscaleLimit>>20)
 
-	cmd := exec.Command("convert", imagePath, "-resize", "1280x1280>", outPath)
+	cmd := exec.CommandContext(ctx, "convert", imagePath, "-resize", "1280x1280>", outPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("   Downscale LLM échoué: %s\n", strings.TrimSpace(string(out)))

@@ -72,12 +72,12 @@ type Region struct {
 //  5. connected-components 8-voisinage + filtre de surface
 //
 // Retourne les régions triées de haut en bas.
-func detectRegions(imagePath string) ([]Region, error) {
+func detectRegions(ctx context.Context, imagePath string) ([]Region, error) {
 	if _, err := exec.LookPath("convert"); err != nil {
 		return nil, fmt.Errorf("ImageMagick non disponible: %w", err)
 	}
 
-	out, err := exec.Command("identify", "-format", "%w %h", imagePath).Output()
+	out, err := exec.CommandContext(ctx, "identify", "-format", "%w %h", imagePath).Output()
 	if err != nil {
 		return nil, fmt.Errorf("identify: %w", err)
 	}
@@ -104,7 +104,7 @@ func detectRegions(imagePath string) ([]Region, error) {
 		blur = 10
 	}
 
-	cmd := exec.Command("convert",
+	cmd := exec.CommandContext(ctx, "convert",
 		imagePath,
 		"-colorspace", "Gray",
 		"-blur", fmt.Sprintf("0x%d", blur),
@@ -236,7 +236,7 @@ func isLightColor(color string) bool {
 	return total/float64(n) > 0.70
 }
 
-func cropRegion(imagePath string, r Region, outPath string, padding int) error {
+func cropRegion(ctx context.Context, imagePath string, r Region, outPath string, padding int) error {
 	x := r.X - padding
 	y := r.Y - padding
 	w := r.Width + 2*padding
@@ -250,7 +250,7 @@ func cropRegion(imagePath string, r Region, outPath string, padding int) error {
 		y = 0
 	}
 	geom := fmt.Sprintf("%dx%d+%d+%d", w, h, x, y)
-	cmd := exec.Command("convert", imagePath, "-crop", geom, "+repage", outPath)
+	cmd := exec.CommandContext(ctx, "convert", imagePath, "-crop", geom, "+repage", outPath)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("crop %s: %w\n%s", geom, err, string(out))
@@ -269,7 +269,7 @@ func cropRegion(imagePath string, r Region, outPath string, padding int) error {
 func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (string, error) {
 	imagePath := path
 	if IsPDF(path) {
-		ip, cleanup, err := convertPDFToImage(path)
+		ip, cleanup, err := convertPDFToImage(ctx, path)
 		if err != nil {
 			return "", err
 		}
@@ -277,7 +277,7 @@ func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (s
 		imagePath = ip
 	}
 
-	regions, err := detectRegions(imagePath)
+	regions, err := detectRegions(ctx, imagePath)
 	if err != nil {
 		return "", err
 	}
@@ -304,7 +304,7 @@ func ExtractWithSegmentation(ctx context.Context, path, model, llmURL string) (s
 	var wg sync.WaitGroup
 	for i, r := range regions {
 		cropPath := filepath.Join(zonesDir, fmt.Sprintf("zone-%02d.png", i+1))
-		if err := cropRegion(imagePath, r, cropPath, 20); err != nil {
+		if err := cropRegion(ctx, imagePath, r, cropPath, 20); err != nil {
 			fmt.Printf("   Crop zone %d échoué: %v\n", i+1, err)
 			continue
 		}
