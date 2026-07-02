@@ -91,6 +91,7 @@ func StartServer() {
 
 	mux := http.NewServeMux()
 
+	mux.HandleFunc("GET /health/live", makeLivenessHandler())
 	mux.HandleFunc("GET /health", makeHealthHandler(queue))
 	mux.HandleFunc("POST /api/v1/supporting-documents", makeSupportingDocumentHandler(queue))
 
@@ -124,10 +125,22 @@ func StartServer() {
 
 // --- Health check ---------------------------------------------------------
 
+// makeLivenessHandler renvoie le handler de /health/live : 200 tant que le
+// process répond, sans appel au backend LLM. Sert de livenessProbe k8s — un
+// LLM down ne doit jamais faire redémarrer le pod, seulement le sortir de la
+// rotation via readiness (/health, qui reste enrichi et dépendant du LLM).
+func makeLivenessHandler() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"status": "ok"})
+	}
+}
+
 // makeHealthHandler renvoie le handler de /health, enrichi des métriques de la
 // queue (workers, profondeur, in-flight) et d'infos de build, pour alimenter le
 // dashboard de monitoring du cluster. Le code HTTP reste 200 (ok) / 503
-// (degraded, LLM injoignable) — la readinessProbe k8s s'en sert.
+// (degraded, LLM injoignable) — sert uniquement de readinessProbe k8s
+// (la livenessProbe utilise /health/live, indépendante du LLM).
 func makeHealthHandler(q *Queue) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		st := q.Stats()

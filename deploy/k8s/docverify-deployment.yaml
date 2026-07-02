@@ -39,7 +39,7 @@ spec:
           value: "1"
         livenessProbe:
           httpGet:
-            path: /health
+            path: /health/live
             port: 8680
           initialDelaySeconds: 5
           periodSeconds: 10
@@ -48,7 +48,7 @@ spec:
             path: /health
             port: 8680
           initialDelaySeconds: 2
-          periodSeconds: 5
+          periodSeconds: 10
         resources:
           requests:
             cpu: "500m"
