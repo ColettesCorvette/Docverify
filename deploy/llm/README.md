@@ -1,11 +1,8 @@
 # Backends LLM vLLM par type de machine
 
-Images vLLM préparées et versionnées pour servir le VLM derrière une API
-OpenAI, une par accélérateur Linux. Des images construites et
-taguées sont plus reproductibles et auditables qu'un script.
+Ce dossier contient des images vLLM prêtes à construire, une par accélérateur Linux, pour servir le modèle vision derrière une API OpenAI. J'ai préféré des images versionnées à un script d'installation : une image construite et taguée se reproduit et s'audite, un script dépend de l'état de la machine.
 
-docverify n'est pas modifié : il parle OpenAI au Service `vllm`, soit
-`LLM_URL=http://vllm:8000/v1`.
+docverify n'a pas besoin d'être modifié : il parle OpenAI au Service `vllm`, donc `LLM_URL=http://vllm:8000/v1` et c'est tout.
 
 ## Plateformes
 
@@ -14,11 +11,9 @@ docverify n'est pas modifié : il parle OpenAI au Service `vllm`, soit
 | NVIDIA CUDA | `Dockerfile.cuda` | `vllm/vllm-openai` | `nvidia.com/gpu` |
 | AMD ROCm | `Dockerfile.rocm` | `vllm/vllm-openai-rocm` | `amd.com/gpu` |
 | Intel Arc / XPU | `Dockerfile.xpu` | `intel/vllm` | `gpu.intel.com/i915` |
-| CPU | `Dockerfile.cpu` | build sources vLLM | cpu / memory |
+| CPU | `Dockerfile.cpu` | build depuis les sources vLLM | cpu / memory |
 
-**macOS n'est pas ici.** Le cluster Mac sert le LLM via Docker Model Runner
-host-native (Metal, llama.cpp GGUF) dans le cluster K8s multi-Mac. vLLM sur Metal
-ne gère pas la vision, donc aucune image macOS n'a de sens pour notre VLM.
+**macOS n'est pas dans la liste**, et c'est voulu. Sur les Macs du cluster, le LLM est servi par Docker Model Runner en process hôte, avec llama.cpp et un GGUF sur Metal. vLLM sur Metal ne gère pas la vision, donc une image macOS n'aurait aucun sens pour notre modèle.
 
 ## Construire
 
@@ -27,33 +22,19 @@ PLATFORM=cuda ./deploy/llm/build.sh
 PLATFORM=rocm VLLM_VERSION=latest REGISTRY=registry.int.orbinea.example ./deploy/llm/build.sh
 ```
 
-À construire et tester **sur la machine cible** ou un CI à l'architecture
-correspondante : ce sont des images linux/amd64 liées à un accélérateur précis,
-non validables sur un Mac Apple Silicon. CPU = fallback fonctionnel, lent par
-nature pour un VLM 7B, cf. le bench DMR CPU vs Metal.
+Il faut construire et tester **sur la machine cible**, ou sur un CI de la même architecture : ce sont des images linux/amd64 liées à un accélérateur précis, impossibles à valider sur un Mac Apple Silicon. La variante CPU marche mais reste lente par nature pour un VLM de cette taille, voir le bench DMR CPU contre Metal.
 
 ## Déployer
 
-1. Construire et pousser l'image de la plateforme du node.
-2. Dans `vllm-deployment.yaml` : mettre l'image, décommenter la bonne ressource
-   GPU, et le `nodeSelector` si le cluster est hétérogène.
-3. Le device plugin de l'accélérateur doit être présent sur le cluster : NVIDIA
-   device plugin, AMD GPU operator, ou Intel device plugin.
-4. `kubectl apply -f deploy/llm/vllm-deployment.yaml`, puis pointer
-   `LLM_URL=http://vllm:8000/v1` côté docverify.
+1. Construire et pousser l'image correspondant à la plateforme du nœud.
+2. Dans `vllm-deployment.yaml`, mettre l'image, décommenter la bonne ressource GPU, et le `nodeSelector` si le cluster est hétérogène.
+3. Vérifier que le device plugin de l'accélérateur est présent sur le cluster : NVIDIA device plugin, AMD GPU operator ou Intel device plugin.
+4. `kubectl apply -f deploy/llm/vllm-deployment.yaml`, puis pointer `LLM_URL=http://vllm:8000/v1` côté docverify.
 
-Le modèle `google/gemma-4-e4b-it` est téléchargé depuis Hugging Face au
-démarrage : c'est le Gemma 4 E4B servi par DMR sur les Macs, ici en modèle HF
-complet plutôt qu'en GGUF Q8 (vLLM sert nativement les modèles HF, vision
-incluse). Gemma est gated : fournir `HF_TOKEN` via un Secret après acceptation
-de la licence sur Hugging Face. Prévoir un volume persistant pour le cache si
-l'on ne veut pas re-télécharger à chaque pod.
+Le modèle `google/gemma-4-e4b-it` est téléchargé depuis Hugging Face au démarrage. C'est le même Gemma 4 E4B que sert DMR sur les Macs, mais en modèle HF complet plutôt qu'en GGUF Q5_K_M, parce que vLLM sert nativement les modèles HF, vision comprise. Attention, Gemma est gated : il faut accepter la licence sur Hugging Face puis fournir `HF_TOKEN` via un Secret. Prévoir aussi un volume persistant pour le cache, sinon chaque pod re-télécharge le modèle.
 
-À VALIDER : le bench groundtruth (100 % avec le GGUF Q8 sous DMR) n'a pas encore
-été rejoué avec ce modèle HF complet servi par vLLM sur une machine GPU. Le
-relancer avant de mettre cette voie en production.
+À VALIDER : le bench groundtruth a été mesuré sur le GGUF Q5_K_M sous DMR, pas sur ce modèle HF complet servi par vLLM. Il faudra le rejouer sur une machine GPU avant de mettre cette voie en production.
 
 ## Référence
 
-Logique vLLM par plateforme : doc officielle vLLM. Images ROCm officielles
-`vllm/vllm-openai-rocm` depuis janvier 2026. XPU validé sur Intel Arc Pro B.
+La logique vLLM par plateforme vient de la doc officielle vLLM. Les images ROCm officielles `vllm/vllm-openai-rocm` existent depuis janvier 2026. La variante XPU a été validée sur Intel Arc Pro B.

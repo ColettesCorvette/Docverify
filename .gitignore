@@ -49,3 +49,6 @@ input*.json
 batch1.json                                                                                                           
     
 docs/
+
+# Instructions Claude Code, pas versionnées
+CLAUDE.md
