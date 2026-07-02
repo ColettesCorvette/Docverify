@@ -65,11 +65,13 @@ func hasComplexBackground(ctx context.Context, imagePath string) bool {
 		return false
 	}
 	// Ratio de pixels blancs (luminosité > 78%)
-	out, err := exec.CommandContext(ctx, "convert", imagePath,
+	out, err := exec.CommandContext(ctx, "convert", imageMagickArgs(
+		imagePath,
 		"-colorspace", "Gray",
 		"-threshold", "78%",
 		"-format", "%[fx:mean]",
-		"info:").Output()
+		"info:",
+	)...).Output()
 	if err != nil {
 		return false
 	}

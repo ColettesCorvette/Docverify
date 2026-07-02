@@ -1,7 +1,9 @@
 package docverify
 
 import (
+	"bytes"
 	"encoding/json"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -54,5 +56,28 @@ func TestHealthDegradedWhenLLMUnreachableButLiveStaysOK(t *testing.T) {
 	makeLivenessHandler()(liveRec, httptest.NewRequest(http.MethodGet, "/health/live", nil))
 	if liveRec.Code != http.StatusOK {
 		t.Errorf("/health/live code = %d, attendu 200 même avec LLM down", liveRec.Code)
+	}
+}
+
+func TestSupportingDocumentRejectsContentExtMismatch(t *testing.T) {
+	q := &Queue{}
+	handler := makeSupportingDocumentHandler(q)
+
+	var body bytes.Buffer
+	w := multipart.NewWriter(&body)
+	part, _ := w.CreateFormFile("doc", "fake.pdf")
+	// signature PNG dans un fichier déclaré .pdf
+	part.Write([]byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0})
+	w.WriteField("name", "DUPONT")
+	w.WriteField("postal_code", "99000")
+	w.Close()
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/supporting-documents", &body)
+	req.Header.Set("Content-Type", w.FormDataContentType())
+	rec := httptest.NewRecorder()
+	handler(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("attendu 400, obtenu %d: %s", rec.Code, rec.Body.String())
 	}
 }

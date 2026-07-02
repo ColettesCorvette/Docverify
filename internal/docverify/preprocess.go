@@ -9,6 +9,22 @@ import (
 	"strings"
 )
 
+// imageMagickLimits borne la mémoire/carte mémoire/disque qu'un process
+// ImageMagick peut consommer sur un upload arbitraire (bombe de
+// décompression, image pathologique). Appliqué à chaque invocation
+// convert/identify du pipeline.
+var imageMagickLimits = []string{
+	"-limit", "memory", "256MiB",
+	"-limit", "map", "512MiB",
+	"-limit", "disk", "1GiB",
+}
+
+// imageMagickArgs préfixe imageMagickLimits aux arguments d'un appel
+// convert/identify.
+func imageMagickArgs(args ...string) []string {
+	return append(append([]string{}, imageMagickLimits...), args...)
+}
+
 // preprocessImage améliore une image avant l'OCR via ImageMagick.
 // Pipeline optimisé pour les documents avec fond complexe (passeports, CNI, etc.) :
 //   - Niveaux de gris
@@ -32,13 +48,13 @@ func preprocessImage(ctx context.Context, imagePath string) (string, func(), err
 	}
 	outPath := filepath.Join(tmpDir, "preprocessed"+ext)
 
-	cmd := exec.CommandContext(ctx, "convert",
+	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(
 		imagePath,
 		"-colorspace", "Gray", // niveaux de gris
 		"-normalize",                 // étire l'histogramme
 		"-contrast-stretch", "3%x3%", // coupe les extrêmes pour booster le contraste
 		outPath,
-	)
+	)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("   Prétraitement image échoué: %s\n", strings.TrimSpace(string(out)))
@@ -96,7 +112,7 @@ func preprocessForLLM(ctx context.Context, imagePath string) (string, func(), er
 	fmt.Printf("   Image source %.1f Mo > %d Mo : downscale 1280px avant LLM\n",
 		float64(info.Size())/(1<<20), llmDownscaleLimit>>20)
 
-	cmd := exec.CommandContext(ctx, "convert", imagePath, "-resize", "1280x1280>", outPath)
+	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(imagePath, "-resize", "1280x1280>", outPath)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		fmt.Printf("   Downscale LLM échoué: %s\n", strings.TrimSpace(string(out)))

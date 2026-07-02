@@ -1,6 +1,7 @@
 package docverify
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -11,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -181,6 +183,26 @@ func writeJSONError(w http.ResponseWriter, status int, msg string) {
 	})
 }
 
+// contentMatchesExt vérifie que les octets de tête du fichier correspondent
+// à l'extension déclarée : un PDF forgé ou un contenu incohérent avec
+// l'extension ne doit pas atteindre ImageMagick/poppler. Extension inconnue
+// (ni PDF ni image supportée) → rejetée.
+func contentMatchesExt(head []byte, ext string) bool {
+	switch strings.ToLower(ext) {
+	case ".pdf":
+		return bytes.HasPrefix(head, []byte("%PDF-"))
+	case ".png":
+		return bytes.HasPrefix(head, []byte{0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A})
+	case ".jpg", ".jpeg":
+		return bytes.HasPrefix(head, []byte{0xFF, 0xD8, 0xFF})
+	case ".tif", ".tiff":
+		return bytes.HasPrefix(head, []byte{0x49, 0x49, 0x2A, 0x00}) ||
+			bytes.HasPrefix(head, []byte{0x4D, 0x4D, 0x00, 0x2A})
+	default:
+		return false
+	}
+}
+
 // --- API v1 : Supporting Documents ----------------------------------------
 
 // POST /api/v1/supporting-documents — upload + analyse d'un justificatif.
@@ -216,12 +238,27 @@ func makeSupportingDocumentHandler(q *Queue) http.HandlerFunc {
 		}
 		defer file.Close()
 
-		dst, err := os.CreateTemp("", "docverify-*"+filepath.Ext(header.Filename))
+		head := make([]byte, 512)
+		n, _ := io.ReadFull(file, head)
+		head = head[:n]
+		ext := filepath.Ext(header.Filename)
+		if !contentMatchesExt(head, ext) {
+			writeJSONError(w, http.StatusBadRequest, "Type de fichier incohérent avec l'extension déclarée")
+			return
+		}
+
+		dst, err := os.CreateTemp("", "docverify-*"+ext)
 		if err != nil {
 			writeJSONError(w, http.StatusInternalServerError, "Erreur création fichier temporaire")
 			return
 		}
 		destinationPath := dst.Name()
+		if _, err := dst.Write(head); err != nil {
+			dst.Close()
+			os.Remove(destinationPath)
+			writeJSONError(w, http.StatusInternalServerError, "Erreur sauvegarde fichier")
+			return
+		}
 		if _, err := io.Copy(dst, file); err != nil {
 			dst.Close()
 			os.Remove(destinationPath)

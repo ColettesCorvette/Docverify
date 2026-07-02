@@ -77,7 +77,7 @@ func detectRegions(ctx context.Context, imagePath string) ([]Region, error) {
 		return nil, fmt.Errorf("ImageMagick non disponible: %w", err)
 	}
 
-	out, err := exec.CommandContext(ctx, "identify", "-format", "%w %h", imagePath).Output()
+	out, err := exec.CommandContext(ctx, "identify", imageMagickArgs("-format", "%w %h", imagePath)...).Output()
 	if err != nil {
 		return nil, fmt.Errorf("identify: %w", err)
 	}
@@ -104,7 +104,7 @@ func detectRegions(ctx context.Context, imagePath string) ([]Region, error) {
 		blur = 10
 	}
 
-	cmd := exec.CommandContext(ctx, "convert",
+	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(
 		imagePath,
 		"-colorspace", "Gray",
 		"-blur", fmt.Sprintf("0x%d", blur),
@@ -114,7 +114,7 @@ func detectRegions(ctx context.Context, imagePath string) ([]Region, error) {
 		"-define", "connected-components:verbose=true",
 		"-connected-components", "8",
 		"null:",
-	)
+	)...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	stdoutBytes, err := cmd.Output()
@@ -250,7 +250,7 @@ func cropRegion(ctx context.Context, imagePath string, r Region, outPath string,
 		y = 0
 	}
 	geom := fmt.Sprintf("%dx%d+%d+%d", w, h, x, y)
-	cmd := exec.CommandContext(ctx, "convert", imagePath, "-crop", geom, "+repage", outPath)
+	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(imagePath, "-crop", geom, "+repage", outPath)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("crop %s: %w\n%s", geom, err, string(out))
