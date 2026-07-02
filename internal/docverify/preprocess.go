@@ -32,14 +32,14 @@ func imageMagickArgs(args ...string) []string {
 //     (la binarisation dégrade les docs avec fond guilloché)
 //
 // Retourne l'image originale si ImageMagick est absent (dégradé gracieux).
-func preprocessImage(ctx context.Context, imagePath string) (string, func(), error) {
+func preprocessImage(ctx context.Context, imagePath string) (string, func()) {
 	if _, err := exec.LookPath("convert"); err != nil {
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
 	tmpDir, err := os.MkdirTemp("", "docverify-preprocess-*")
 	if err != nil {
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
 	ext := filepath.Ext(imagePath)
@@ -59,10 +59,10 @@ func preprocessImage(ctx context.Context, imagePath string) (string, func(), err
 	if err != nil {
 		log.Printf("   Prétraitement image échoué: %s", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
-	return outPath, func() { os.RemoveAll(tmpDir) }, nil
+	return outPath, func() { os.RemoveAll(tmpDir) }
 }
 
 func isImageMagickAvailable() bool {
@@ -88,19 +88,19 @@ const llmDownscaleLimit = 1 * (1 << 20) // 1 Mo
 //
 // Retourne l'image originale si ImageMagick est absent, si l'image est sous le
 // seuil, ou si la conversion échoue.
-func preprocessForLLM(ctx context.Context, imagePath string) (string, func(), error) {
+func preprocessForLLM(ctx context.Context, imagePath string) (string, func()) {
 	if !isImageMagickAvailable() {
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
 	info, err := os.Stat(imagePath)
 	if err != nil || info.Size() <= llmDownscaleLimit {
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
 	tmpDir, err := os.MkdirTemp("", "docverify-llm-preprocess-*")
 	if err != nil {
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
 	ext := filepath.Ext(imagePath)
@@ -117,8 +117,8 @@ func preprocessForLLM(ctx context.Context, imagePath string) (string, func(), er
 	if err != nil {
 		log.Printf("   Downscale LLM échoué: %s", strings.TrimSpace(string(out)))
 		os.RemoveAll(tmpDir)
-		return imagePath, func() {}, nil
+		return imagePath, func() {}
 	}
 
-	return outPath, func() { os.RemoveAll(tmpDir) }, nil
+	return outPath, func() { os.RemoveAll(tmpDir) }
 }

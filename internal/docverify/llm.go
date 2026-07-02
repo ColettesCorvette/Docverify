@@ -143,25 +143,28 @@ func InitLLM() {
 		if err != nil {
 			continue
 		}
-		defer resp.Body.Close()
 
-		if resp.StatusCode == http.StatusOK {
-			detectedLLMURL = baseURL
-			log.Printf("[llm-detect] Backend LLM détecté : %s", baseURL)
-
-			var modelResp struct {
-				Data []struct {
-					ID string `json:"id"`
-				} `json:"data"`
-			}
-			if bodyBytes, rerr := io.ReadAll(resp.Body); rerr == nil {
-				if merr := json.Unmarshal(bodyBytes, &modelResp); merr == nil && len(modelResp.Data) > 0 {
-					detectedModelName = modelResp.Data[0].ID
-					log.Printf("[llm-detect] Modèle actif détecté : %s", detectedModelName)
-				}
-			}
-			return
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			continue
 		}
+
+		detectedLLMURL = baseURL
+		log.Printf("[llm-detect] Backend LLM détecté : %s", baseURL)
+
+		var modelResp struct {
+			Data []struct {
+				ID string `json:"id"`
+			} `json:"data"`
+		}
+		if bodyBytes, rerr := io.ReadAll(resp.Body); rerr == nil {
+			if merr := json.Unmarshal(bodyBytes, &modelResp); merr == nil && len(modelResp.Data) > 0 {
+				detectedModelName = modelResp.Data[0].ID
+				log.Printf("[llm-detect] Modèle actif détecté : %s", detectedModelName)
+			}
+		}
+		resp.Body.Close()
+		return
 	}
 
 	log.Printf("[llm-detect] Aucun backend LLM actif détecté. Fallbacks par défaut utilisés.")
@@ -189,7 +192,7 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 		}
 	}
 
-	processedPath, cleanup, _ := preprocessForLLM(ctx, imagePath)
+	processedPath, cleanup := preprocessForLLM(ctx, imagePath)
 	defer cleanup()
 
 	if os.Getenv("DOCVERIFY_DEBUG_OCR") == "1" {

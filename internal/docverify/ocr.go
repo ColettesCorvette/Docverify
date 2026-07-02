@@ -127,7 +127,7 @@ func ExtractText(ctx context.Context, imagePath, model, llmURL string) (string, 
 	// Étape 2 : prétraitement + retry
 	if isImageMagickAvailable() {
 		log.Println("   Prétraitement : ImageMagick → retry Tesseract")
-		pp, cleanup, _ := preprocessImage(ctx, imagePath)
+		pp, cleanup := preprocessImage(ctx, imagePath)
 		defer cleanup()
 		text2, q2 := bestTesseractResult(ctx, pp)
 		log.Printf("   Qualité OCR   : %.0f%%", q2*100)
