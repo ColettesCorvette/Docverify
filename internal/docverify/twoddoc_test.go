@@ -99,6 +99,49 @@ func TestAnalyzeFrom2DDOC_EDF(t *testing.T) {
 	}
 }
 
+func TestAnalyzeFrom2DDOC_FallbackCPComposite(t *testing.T) {
+	// rawBERTRAND concatène AC+CertID+CP+n°voie sans séparateur dans son
+	// premier champ ("FR299000010..."), donnant en texte synthétique
+	// "26 FR299000010MME/SOPHIE/BERTRAND" : "99000" y apparaît bien en
+	// sous-chaîne, mais entouré de chiffres (...99000010...), donc sans
+	// frontière de mot — wordBoundaryContains échoue seul sur ce champ.
+	// Ce test verrouille explicitement que le fallback en sous-chaîne de
+	// AnalyzeFrom2DDOC prend le relais et pose PostalFound/PostalMatch.
+	doc, err := Parse2DDOC(rawBERTRAND)
+	if err != nil {
+		t.Fatalf("Parse2DDOC: %v", err)
+	}
+	if wordBoundaryContains(doc.syntheticText(), "99000") {
+		t.Fatalf("précondition invalide : wordBoundaryContains trouve déjà 99000 sans le fallback")
+	}
+	a := AnalyzeFrom2DDOC(doc, Input{Name: "BERTRAND", PostalCodes: []string{"99000"}})
+
+	if !a.PostalFound || a.PostalMatch != "99000" {
+		t.Errorf("PostalMatch = %q (found=%v), attendu 99000 via le fallback sous-chaîne", a.PostalMatch, a.PostalFound)
+	}
+}
+
+func TestAnalyzeFrom2DDOC_FallbackNeCourtCircuitePasLaPasseStricte(t *testing.T) {
+	// rawEDF a une frontière de mot propre autour du CP ("24" + "17999"
+	// -> "24 17999" en texte synthétique) : la passe stricte AnalyzeText
+	// (wordBoundaryContains) doit trouver 17999 sans recours au fallback.
+	// On fournit aussi un faux code postal qui n'apparaît nulle part dans
+	// le payload, pour s'assurer que c'est bien le CP valide qui gagne et
+	// non un artefact du fallback.
+	doc, err := Parse2DDOC(rawEDF)
+	if err != nil {
+		t.Fatalf("Parse2DDOC: %v", err)
+	}
+	if !wordBoundaryContains(doc.syntheticText(), "17999") {
+		t.Fatalf("précondition invalide : wordBoundaryContains ne trouve pas 17999 sans le fallback")
+	}
+	a := AnalyzeFrom2DDOC(doc, Input{Name: "LEROY", Surname: "PIERRE", PostalCodes: []string{"99999", "17999"}})
+
+	if !a.PostalFound || a.PostalMatch != "17999" {
+		t.Errorf("PostalMatch = %q (found=%v), attendu 17999 via la passe stricte", a.PostalMatch, a.PostalFound)
+	}
+}
+
 func TestAnalyzeFrom2DDOC_NomAbsent(t *testing.T) {
 	// Le 2D-DOC est au nom de BERTRAND : un input ORBINEA ne doit pas matcher,
 	// et le verdict doit être négatif quelle que soit la date.
