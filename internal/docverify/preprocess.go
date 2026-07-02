@@ -115,7 +115,7 @@ func preprocessForLLM(ctx context.Context, imagePath string) (string, func()) {
 	cmd := exec.CommandContext(ctx, "convert", imageMagickArgs(imagePath, "-resize", "1280x1280>", outPath)...)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Printf("   Downscale LLM échoué: %s", strings.TrimSpace(string(out)))
+		log.Printf("   Downscale LLM échoué: %s (%v)", strings.TrimSpace(string(out)), err)
 		os.RemoveAll(tmpDir)
 		return imagePath, func() {}
 	}

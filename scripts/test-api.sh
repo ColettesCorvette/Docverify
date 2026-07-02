@@ -35,14 +35,23 @@ separator() {
 
 # post_doc envoie un document en POST synchrone, affiche l'en-tête X-Request-Id
 # puis le verdict JSON. Tous les champs multipart sont passés en arguments.
+# Marque FAILED=1 si le code HTTP n'est pas 200 (asserté en fin de script).
 post_doc() {
     local headers
     headers="$(mktemp)"
-    local body
-    body="$(curl -s -D "$headers" -X POST "$API$ROUTE" "$@")"
+    local out code body
+    out="$(curl -s -D "$headers" -w '\n%{http_code}' -X POST "$API$ROUTE" "$@")"
+    code="${out##*$'\n'}"
+    body="${out%$'\n'*}"
     grep -i '^X-Request-Id:' "$headers" | tr -d '\r'
     rm -f "$headers"
     echo "$body" | jq
+    if [ "$code" = "200" ]; then
+        echo -e "${GREEN}✓ HTTP 200${NC}"
+    else
+        echo -e "${RED}✗ HTTP $code${NC}"
+        FAILED=1
+    fi
 }
 
 test_health() {
@@ -174,4 +183,8 @@ case "${1:-all}" in
 esac
 
 echo ""
+if [ "${FAILED:-0}" = "1" ]; then
+    echo -e "${RED}✗ Tests terminés avec échecs${NC}"
+    exit 1
+fi
 echo -e "${GREEN}✓ Tests terminés${NC}"
