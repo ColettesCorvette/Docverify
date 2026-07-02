@@ -63,7 +63,7 @@ func tryPDFToText(ctx context.Context, pdfPath string) (string, bool) {
 
 	// Si le texte extrait est trop court, le PDF est probablement scanné
 	if len([]rune(text)) < minTextChars {
-		log.Printf("   pdftotext : seulement %d caractères extraits → PDF scanné\n", len([]rune(text)))
+		log.Printf("   pdftotext : seulement %d caractères extraits → PDF scanné", len([]rune(text)))
 		return "", false
 	}
 
