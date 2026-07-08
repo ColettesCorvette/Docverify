@@ -186,7 +186,7 @@ func postCallback(callbackURL string, cb asyncCallback) {
 			log.Printf("[async %s] callback livré (%s → HTTP %d)", cb.JobID, cb.Status, resp.StatusCode)
 			return
 		}
-		
+
 		var errReason string
 		if err != nil {
 			errReason = err.Error()

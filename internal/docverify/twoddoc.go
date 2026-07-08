@@ -41,15 +41,15 @@ var ddocEpoch = time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
 
 // TwoDDoc contient les éléments extraits d'un 2D-DOC.
 type TwoDDoc struct {
-	Version      string
-	AC           string    // autorité de certification émettrice
-	CertID       string    // identifiant du certificat
-	TypeID       string    // type de document (code ANTS)
-	EmitDate     time.Time // date d'émission (entête)
-	DataZone     string    // données brutes hors signature (champs séparés par GS)
-	HasSignature bool
-	SignedPayload string   // entête + données, octets effectivement signés (avant US)
-	Signature     string   // signature en base32 (après US)
+	Version       string
+	AC            string    // autorité de certification émettrice
+	CertID        string    // identifiant du certificat
+	TypeID        string    // type de document (code ANTS)
+	EmitDate      time.Time // date d'émission (entête)
+	DataZone      string    // données brutes hors signature (champs séparés par GS)
+	HasSignature  bool
+	SignedPayload string // entête + données, octets effectivement signés (avant US)
+	Signature     string // signature en base32 (après US)
 }
 
 // Decode2DDOC tente de lire un Datamatrix 2D-DOC dans le fichier via dmtxread

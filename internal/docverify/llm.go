@@ -119,11 +119,11 @@ func InitLLM() {
 	defer cancel()
 
 	candidates := []string{
-		"http://192.168.65.254:12434/engines",   // Docker Desktop host-gateway (Mac)
+		"http://192.168.65.254:12434/engines",     // Docker Desktop host-gateway (Mac)
 		"http://host.lima.internal:12434/engines", // VM Lima k3s (Mac VM)
-		"http://localhost:12434/engines",        // DMR local (Mac host)
-		"http://localhost:8000",                 // vLLM local (Linux host/hostNetwork)
-		"http://vllm:8000",                      // Service vLLM K8s (Linux)
+		"http://localhost:12434/engines",          // DMR local (Mac host)
+		"http://localhost:8000",                   // vLLM local (Linux host/hostNetwork)
+		"http://vllm:8000",                        // Service vLLM K8s (Linux)
 	}
 
 	// Si LLM_URL est défini, c'est l'unique candidat à tester pour le modèle
@@ -219,10 +219,10 @@ func RunLLM(ctx context.Context, imagePath, model, llmURL string) (string, error
 				{Type: "image_url", ImageURL: &imageURL{URL: dataURL}},
 			},
 		}},
-		MaxTokens:        700,
-		Temperature:      0,
-		Stream:           false,
-		FrequencyPenalty: 0.3,
+		MaxTokens:          700,
+		Temperature:        0,
+		Stream:             false,
+		FrequencyPenalty:   0.3,
 		ChatTemplateKwargs: map[string]any{"enable_thinking": false},
 	}
 
