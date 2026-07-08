@@ -1,7 +1,7 @@
 {
   "_meta": {
     "version": "2026-06-08",
-    "samples_dir": "/Users/dev/Desktop/LLM/ocr/samples",
+    "samples_dir": "samples/ du dépôt",
     "notes": "Vérité de terrain pour le bench multi-modèles. 'expected' liste ce que la sortie LLM doit produire sur ce sample. 'expected.ok' tient compte du contrat applicatif (valid_months=3 pour les factures, expiration des pièces d'identité, etc.). 2026-06-08 : ANNULATION des 'corrections' du 2026-06-04 sur cni8493 et solange — elles étaient fausses (dates de délivrance confondues avec l'expiration). Les deux pièces sont VALIDES (cni8493 expire 22/09/2026, solange 31/05/2030), donc ok:true. Vérifié sur les images avec le user. Le modèle qui lit correctement les deux dates et retient l'expiration la plus tardive est le bon."
   },
   "samples": {
