@@ -29,22 +29,22 @@ type AnalysisResult struct {
 	PostalFound  bool    `json:"postal_found"`
 	PostalMatch  string  `json:"postal_match,omitempty"`
 	// Pour les passeports/CNI : dates spécifiques
-	DateFound  bool              `json:"date_found"`
-	DateValid  bool              `json:"date_valid"`
-	DocDate    string            `json:"doc_date,omitempty"`
-	ExpiryDate string            `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
-	IssueDate  string            `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
-	BirthDate  string            `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
-	Unreadable bool              `json:"unreadable,omitempty"` // document illisible, review humaine requise
+	DateFound  bool   `json:"date_found"`
+	DateValid  bool   `json:"date_valid"`
+	DocDate    string `json:"doc_date,omitempty"`
+	ExpiryDate string `json:"expiry_date,omitempty"` // date d'expiration (passeport/CNI)
+	IssueDate  string `json:"issue_date,omitempty"`  // date d'émission (passeport/CNI)
+	BirthDate  string `json:"birth_date,omitempty"`  // date de naissance (passeport/CNI)
+	Unreadable bool   `json:"unreadable,omitempty"`  // document illisible, review humaine requise
 	// Confidence : niveau de confiance dans l'extraction (pas la validité).
 	// nul | bas | moyen | haut. Sert à Regia pour décider de l'automatisation :
 	// haut → auto, moyen/bas → confirmation manuelle, nul → rejet/review.
-	Confidence string   `json:"confidence,omitempty"`
+	Confidence string `json:"confidence,omitempty"`
 	// SignatureVerified : true si la signature 2D-DOC a été validée contre la
 	// TSL ANTS (anti-fraude). Renseigné uniquement sur le chemin 2D-DOC.
 	SignatureVerified bool     `json:"signature_verified,omitempty"`
 	Errors            []string `json:"errors,omitempty"`
-	RawText    string   `json:"raw_text,omitempty"`
+	RawText           string   `json:"raw_text,omitempty"`
 	// source trace le chemin qui a produit le résultat ; non sérialisé,
 	// renseigné par le pipeline pour calculer Confidence.
 	source confidenceSource
@@ -132,6 +132,29 @@ var docTypeKeywords = map[DocType][]string{
 // souvent trop bruités pour le scoring par mots-clés alors que la MRZ reste
 // lisible. Tolère un caractère parasite entre ID et FRA inséré par l'OCR.
 var mrzIDRe = regexp.MustCompile(`ID.?FRA`)
+
+// mrzNameRes capture le nom porté par la première ligne d'une MRZ. Le nom y
+// est collé au préfixe (IDFRADURAND<<< sur une CNI, P<MARBEN<AMAR<< sur un
+// passeport) et ses mots sont séparés par des '<', donc invisible pour le
+// matching sur frontières de mot sans expansion préalable (cas solange :
+// champ Nom mal OCRisé, seule la MRZ porte le nom exact).
+var mrzNameRes = []*regexp.Regexp{
+	regexp.MustCompile(`ID.?FRA([A-Z<]+)`),          // CNI française
+	regexp.MustCompile(`P[A-Z]?<[A-Z]{3}([A-Z<]+)`), // passeport, nom après le code pays
+}
+
+// mrzExpandName retourne les noms extraits des lignes MRZ sous forme de mots
+// séparés par des espaces ("" si pas de MRZ). Attend un texte déjà en
+// majuscules.
+func mrzExpandName(upper string) string {
+	var words []string
+	for _, re := range mrzNameRes {
+		if m := re.FindStringSubmatch(upper); m != nil {
+			words = append(words, strings.FieldsFunc(m[1], func(r rune) bool { return r == '<' })...)
+		}
+	}
+	return strings.Join(words, " ")
+}
 
 // mrzPassportRe matche la première ligne d'une MRZ de passeport (P<FRA,
 // P<MAR...). Le filler < est exigé pour ne pas matcher un mot courant tel
@@ -497,6 +520,9 @@ func wordBoundaryContains(haystack, needle string) bool {
 // Retourne (nameFound, surnameFound, description).
 func searchName(text, name, surname string) (bool, bool, string) {
 	upper := accentReplacer.Replace(strings.ToUpper(text))
+	if mrzName := mrzExpandName(upper); mrzName != "" {
+		upper += "\n" + mrzName
+	}
 	uName := accentReplacer.Replace(strings.ToUpper(strings.TrimSpace(name)))
 	uSurname := accentReplacer.Replace(strings.ToUpper(strings.TrimSpace(surname)))
 

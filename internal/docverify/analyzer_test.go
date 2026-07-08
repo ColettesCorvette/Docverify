@@ -128,6 +128,29 @@ func TestSearchNameWordBoundary(t *testing.T) {
 	}
 }
 
+func TestSearchNameMRZ(t *testing.T) {
+	// Cas solange : le champ Nom d'une CNI scannée est mal lu (DURANO) mais
+	// la MRZ porte le nom exact, collé au préfixe IDFRA. Le matching sur
+	// frontières de mot ne le voit pas sans expansion de la MRZ.
+	text := "Nom: DURANO\nPrénom(s): SOLANGE GERMAINE\nIDFRADURAND<<<<<<<<<<<<<<<<<<<<123456\n112233445566SOLANGE<<GERMA1234562F8"
+	gotName, gotSurn, _ := searchName(text, "DURAND", "SOLANGE")
+	if !gotName || !gotSurn {
+		t.Errorf("searchName MRZ = (%v,%v), attendu (true,true) : le nom doit être extrait de IDFRADURAND<<", gotName, gotSurn)
+	}
+	// Nom composé : '<' sépare les mots dans la MRZ.
+	if found, _, _ := searchName("IDFRALE<GALL<<<<<<<<<<<<543128", "LE GALL", ""); !found {
+		t.Error("searchName devrait matcher 'LE GALL' depuis la MRZ IDFRALE<GALL<<")
+	}
+	// MRZ passeport : le nom suit le code pays (cas cni8493, passeport marocain).
+	if found, _, _ := searchName("P<MARBEN<AMAR<<LEILA<<<<<<<<<<<<<<<<<<<<", "BEN AMAR", ""); !found {
+		t.Error("searchName devrait matcher 'BEN AMAR' depuis la MRZ passeport P<MARBEN<AMAR<<")
+	}
+	gotName, gotSurn, _ = searchName("P<FRAMARTIN<<JEAN<PIERRE<<<<<<<<<<<<<<<<", "MARTIN", "JEAN")
+	if !gotName || !gotSurn {
+		t.Errorf("searchName MRZ passeport = (%v,%v), attendu (true,true)", gotName, gotSurn)
+	}
+}
+
 func TestAnalyzeTextPostalWordBoundary(t *testing.T) {
 	text := "FACTURE Total TTC TVA Tel: 0600000000"
 	result := AnalyzeText(text, Input{Name: "X", PostalCodes: []string{"99000"}})
