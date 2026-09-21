@@ -4,6 +4,11 @@
 ![Kubernetes](https://img.shields.io/badge/Kubernetes-k3d-326CE5?logo=kubernetes&logoColor=white)
 ![Docker](https://img.shields.io/badge/Docker-Model%20Runner-2496ED?logo=docker&logoColor=white)
 
+
+> **Projet de stage, publié anonymisé.** Les noms d'entreprise, de produits,
+> de clients et de personnes ont été remplacés, et les documents d'exemple
+> retirés. Voir [ANONYMISATION.md](ANONYMISATION.md).
+
 `docverify` est un service Go qui vérifie des justificatifs administratifs : factures, cartes d'identité, passeports, justificatifs de domicile. Le back-office Regia lui envoie un document avec l'identité et l'adresse attendues, et docverify répond par un verdict : le document est-il valide, le nom et le code postal correspondent-ils, la date est-elle encore bonne. Pour y arriver il combine de l'OCR classique et un LLM multimodal, le tout sur Kubernetes.
 
 La doc détaillée est dans le [wiki](https://git.int.orbinea.example/tfuchs/docverify/wiki/Home). Ce README donne la vue d'ensemble et ce qu'il faut pour développer en local.
