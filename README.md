@@ -1,3 +1,5 @@
+![docverify](assets/banniere.png)
+
 # docverify
 
 ![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
